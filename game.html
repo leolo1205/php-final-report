@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>異界塔 — 主畫面</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <span class="logo">⚔ 異界塔</span>
+    <div class="user-info">
+      <span class="username" id="ui-username"></span>
+      <span id="admin-link" style="display:none">
+        <a href="admin.html" style="font-size:.82em;color:var(--secondary);text-decoration:none">後台管理</a>
+      </span>
+      <span class="logout" onclick="logout()">登出</span>
+    </div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- 左側：角色卡 -->
+    <div class="char-card">
+
+      <div class="card">
+        <div class="char-avatar">
+          <span class="avatar-icon">🧙</span>
+          <div class="char-name" id="ui-charname"></div>
+          <div class="char-level" id="ui-level"></div>
+        </div>
+        <div class="hp-bar-wrap">
+          <div class="hp-label"><span>HP</span><span id="ui-hp-text"></span></div>
+          <div class="bar"><div class="bar-fill hp" id="ui-hp-bar"></div></div>
+        </div>
+        <div class="hp-bar-wrap" style="margin-top:10px">
+          <div class="hp-label"><span>EXP</span><span id="ui-exp-text"></span></div>
+          <div class="bar"><div class="bar-fill exp" id="ui-exp-bar"></div></div>
+        </div>
+      </div>
+
+      <!-- 六圍屬性 -->
+      <div class="card">
+        <h3 style="color:var(--secondary);font-size:.9em;margin-bottom:12px">屬性值</h3>
+        <div class="stats-grid">
+          <div class="stat-item"><span class="stat-name">⚔ 力量</span><span><span class="stat-val" id="st-str"></span><span class="stat-delta" id="sd-str"></span></span></div>
+          <div class="stat-item"><span class="stat-name">💨 敏捷</span><span><span class="stat-val" id="st-agi"></span><span class="stat-delta" id="sd-agi"></span></span></div>
+          <div class="stat-item"><span class="stat-name">🛡 體魄</span><span><span class="stat-val" id="st-vit"></span><span class="stat-delta" id="sd-vit"></span></span></div>
+          <div class="stat-item"><span class="stat-name">📖 智慧</span><span><span class="stat-val" id="st-wis"></span><span class="stat-delta" id="sd-wis"></span></span></div>
+          <div class="stat-item"><span class="stat-name">👁 感知</span><span><span class="stat-val" id="st-per"></span><span class="stat-delta" id="sd-per"></span></span></div>
+          <div class="stat-item"><span class="stat-name">✨ 魅力</span><span><span class="stat-val" id="st-cha"></span><span class="stat-delta" id="sd-cha"></span></span></div>
+        </div>
+      </div>
+
+      <!-- 訓練 -->
+      <div class="card train-section">
+        <button class="btn btn-green" id="train-btn" onclick="train()" style="width:100%;padding:14px;font-size:1em">🏋 開始訓練</button>
+        <div class="cd-text" id="cd-text"></div>
+      </div>
+
+    </div>
+
+    <!-- 右側 -->
+    <div class="right-col">
+
+      <div class="card tower-card">
+        <h2>⛩ 異界塔</h2>
+        <div class="floor-num" id="ui-floor"></div>
+        <div class="floor-label">當前層數</div>
+        <div class="floor-desc" id="ui-floor-desc"></div>
+        <button class="btn btn-secondary" onclick="goTower()">⚔ 進入挑戰</button>
+      </div>
+
+      <div class="card leaderboard-card">
+        <h3>🏆 排行榜（爬塔層數）</h3>
+        <ul class="rank-list" id="rank-list"></ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="assets/game.js"></script>
+<script>
+const STAT_LABELS = { str:'力量', agi:'敏捷', vit:'體魄', wis:'智慧', per:'感知', cha:'魅力' };
+const RANK_CLS    = ['gold','silver','bronze'];
+
+let currentUser, char;
+
+function init() {
+  currentUser = loadState('currentUser');
+  if (!currentUser) { location.href = 'index.html'; return; }
+  const accounts = loadState('accounts') || {};
+  if (!accounts[currentUser]) { location.href = 'index.html'; return; }
+
+  if (accounts[currentUser].role === 'admin')
+    document.getElementById('admin-link').style.display = '';
+
+  char = accounts[currentUser].char;
+  renderAll();
+  startCdTimer();
+  renderLeaderboard();
+}
+
+function renderAll() {
+  const accounts = loadState('accounts') || {};
+  char = accounts[currentUser].char;
+
+  document.getElementById('ui-username').textContent  = currentUser;
+  document.getElementById('ui-charname').textContent  = char.name;
+  document.getElementById('ui-level').textContent     = `Lv. ${char.level}`;
+  document.getElementById('ui-hp-text').textContent   = `${char.hp} / ${char.maxHp}`;
+  document.getElementById('ui-hp-bar').style.width    = (char.hp / char.maxHp * 100) + '%';
+  document.getElementById('ui-exp-text').textContent  = `${char.exp} / ${char.expMax}`;
+  document.getElementById('ui-exp-bar').style.width   = (char.exp / char.expMax * 100) + '%';
+
+  ['str','agi','vit','wis','per','cha'].forEach(s => {
+    document.getElementById(`st-${s}`).textContent = char[s];
+    const d  = char.lastDelta?.[s] || 0;
+    const el = document.getElementById(`sd-${s}`);
+    if (d > 0) { el.textContent = `+${d}`; el.className = 'stat-delta pos'; }
+    else       { el.textContent = '';      el.className = 'stat-delta'; }
+  });
+
+  const monster = getMonster(char.towerFloor);
+  document.getElementById('ui-floor').textContent     = char.towerFloor;
+  document.getElementById('ui-floor-desc').textContent =
+    monster.isBoss ? '⚠ BOSS 層！準備好了嗎？' : `第 ${char.towerFloor} 層 — ${monster.name}`;
+}
+
+function train() {
+  const result = doTrain(char);
+  if (!result.ok) {
+    showToast(`訓練冷卻中，剩餘 ${fmtTime(result.remaining)}`);
+    return;
+  }
+  saveChar();
+  renderAll();
+
+  const gained = Object.entries(result.delta)
+    .filter(([,v]) => v > 0)
+    .map(([k,v]) => `${STAT_LABELS[k]}+${v}`)
+    .join('、');
+
+  showToast(
+    result.leveledUp
+      ? `🎉 升級！Lv.${char.level}！${gained}，EXP+${result.expGain}`
+      : `訓練完成！${gained}，EXP+${result.expGain}`,
+    3000
+  );
+  renderLeaderboard();
+}
+
+function startCdTimer() {
+  function tick() {
+    const elapsed   = char.lastTrained ? Date.now() - char.lastTrained : TRAIN_CD_MS;
+    const remaining = TRAIN_CD_MS - elapsed;
+    const btn  = document.getElementById('train-btn');
+    const cdEl = document.getElementById('cd-text');
+    if (remaining <= 0) {
+      btn.disabled  = false;
+      cdEl.innerHTML = '訓練已就緒！';
+    } else {
+      btn.disabled  = true;
+      cdEl.innerHTML = `冷卻中：<span>${fmtTime(remaining)}</span>`;
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+function renderLeaderboard() {
+  const accounts = loadState('accounts') || {};
+  const list = Object.entries(accounts)
+    .filter(([, d]) => d.role !== 'admin')
+    .map(([user, d]) => ({ user, floor: d.char?.towerFloor || 1, level: d.char?.level || 1 }))
+    .sort((a, b) => b.floor - a.floor || b.level - a.level)
+    .slice(0, 5);
+
+  const ul = document.getElementById('rank-list');
+  ul.innerHTML = '';
+  list.forEach((entry, i) => {
+    const li = document.createElement('li');
+    li.className = 'rank-item';
+    li.innerHTML = `
+      <span class="rank-no ${RANK_CLS[i] || ''}">${i + 1}</span>
+      <span class="rank-name">${entry.user} <span style="color:var(--muted);font-size:.8em">Lv.${entry.level}</span></span>
+      <span class="rank-floor">${entry.floor} 層</span>`;
+    ul.appendChild(li);
+  });
+}
+
+function saveChar() {
+  const accounts = loadState('accounts') || {};
+  accounts[currentUser].char = char;
+  saveState('accounts', accounts);
+}
+
+function goTower() {
+  saveChar();
+  location.href = 'battle.html';
+}
+
+function logout() {
+  saveState('currentUser', null);
+  location.href = 'index.html';
+}
+
+init();
+</script>
+</body>
+</html>
