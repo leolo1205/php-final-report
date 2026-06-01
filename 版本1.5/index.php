@@ -37,15 +37,14 @@ if (isset($_POST['reset_account'])) {
     $msg .= "<span style='color:#f44336;'><b>🚨 帳號已成功重置。一切重新開始。</b></span><br>";
 }
 
-// --- 處理三階段訓練 ---
+// --- 處理訓練（立即發獎）---
 if (isset($_POST['start_train'])) {
-    $conn->query("UPDATE users SET last_train_time = NOW() WHERE id = $user_id");
-    $msg .= "💪 訓練開始！請等待倒數結束。<br>";
-}
-if (isset($_POST['claim_train'])) {
-    $r = claim_training_reward($conn, $user_id);
+    $plan_key = $_POST['plan'] ?? 'short';
+    $r = start_training($conn, $user_id, $plan_key);
     if ($r['success']) {
-        $msg .= "<span style='color:#ffeb3b;'>🎁 訓練完成！獲得 {$r['exp_gained']} EXP 與 <b>1 點自由屬性點</b>！</span><br>";
+        $msg .= "<span style='color:#ffeb3b;'>💪 {$r['label']}訓練開始！立即獲得 <b>{$r['exp_gained']} EXP</b> 與 <b>{$r['stat_gained']} 屬性點</b>！</span><br>";
+    } else {
+        $msg .= "<span style='color:#ef9a9a;'>⏳ {$r['message']}</span><br>";
     }
 }
 
@@ -56,10 +55,11 @@ if ($lv_result['leveled_up']) {
 }
 $user = $conn->query("SELECT * FROM users WHERE id = $user_id")->fetch_assoc();
 
-// --- 計算訓練狀態 ---
-$cooldown = check_training_cooldown($conn, $user_id);
-$train_state = !$cooldown['is_training'] ? 'idle' : ($cooldown['can_claim'] ? 'claim' : 'training');
+// --- 計算訓練冷卻狀態 ---
+$cooldown     = check_training_cooldown($conn, $user_id);
+$train_state  = $cooldown['is_training'] ? 'cooling' : 'idle';
 $remaining_cd = $cooldown['seconds_remaining'];
+$train_plans  = get_train_plans();
 
 // 讀取技能爆擊率與閃避率
 $crit_lvl = 0;
@@ -75,9 +75,8 @@ $actual_crit_rate = 10 + $crit_lvl;
 $actual_dodge_rate = 10 + $dodge_lvl;
 
 if ($msg === "") {
-    if ($train_state === 'claim') $msg = "<span style='color:#ffeb3b;'>✨ 訓練已結束，請點擊下方按鈕領取獎勵！</span>";
-    elseif ($train_state === 'training') $msg = "<span style='color:#a5d6a7;'>⏳ 正在進行嚴格的屬性鍛鍊中...</span>";
-    else $msg = "<span style='color:#a5d6a7;'>⛺ 目前閒置中，隨時可以開始新的訓練。</span>";
+    if ($train_state === 'cooling') $msg = "<span style='color:#a5d6a7;'>⏳ 訓練冷卻中，獎勵已領取，等待結束後可再次訓練。</span>";
+    else $msg = "<span style='color:#a5d6a7;'>⛺ 目前閒置中，選擇訓練方案立即獲得獎勵。</span>";
 }
 
 $exp_needed = $user['level'] * 100;
@@ -127,8 +126,11 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
 
 <div class="container">
     <div class="panel">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <h2>🧑‍🚀 <?php echo $user['username']; ?> <span style="font-size: 14px; color: #aaa;">(Lv. <?php echo $user['level']; ?>)</span></h2>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin-bottom: 0;">🧑‍🚀 <?php echo $user['username']; ?> <span style="font-size: 14px; color: #aaa;">(Lv. <?php echo $user['level']; ?>)</span></h2>
+            <a href="logout.php" style="text-decoration: none;">
+                <button type="button" style="background: transparent; color: #f44336; border: 1px solid #f44336; padding: 5px 12px; font-size: 12px; width: auto; border-radius: 5px; cursor: pointer; white-space: nowrap;" onmouseover="this.style.background='#f44336';this.style.color='#fff';" onmouseout="this.style.background='transparent';this.style.color='#f44336';">登出</button>
+            </a>
         </div>
         
         <div class='msg'><?php echo $msg; ?></div>
@@ -163,15 +165,39 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
             <button type="button" style="background-color: #9c27b0; color: white; margin-bottom: 8px;">📖 查看被動技能</button>
         </a>
 
-        <form method="post" id="trainForm">
-            <?php if ($train_state === 'idle'): ?>
-                <button type="submit" name="start_train" class="btn-train">💪 開始訓練 (10秒)</button>
-            <?php elseif ($train_state === 'claim'): ?>
-                <button type="submit" name="claim_train" class="btn-claim">🎁 領取訓練獎勵</button>
-            <?php else: ?>
-                <button type="submit" name="start_train" id="trainBtn" class="btn-train" disabled style="background-color: #555; cursor: not-allowed;">💪 訓練中...</button>
-            <?php endif; ?>
-        </form>
+        <!-- 訓練方案 -->
+        <?php if ($train_state === 'idle'): ?>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <?php
+          $plan_styles = [
+            'short'  => ['bg'=>'#2e7d32','border'=>'#1b5e20','icon'=>'⚡','desc'=>'+50 EXP  +1 屬性點'],
+            'medium' => ['bg'=>'#1565c0','border'=>'#0d47a1','icon'=>'🔥','desc'=>'+300 EXP  +3 屬性點'],
+            'long'   => ['bg'=>'#6a1b9a','border'=>'#4a148c','icon'=>'💎','desc'=>'+1500 EXP  +10 屬性點'],
+          ];
+          foreach ($train_plans as $key => $plan):
+            $ps = $plan_styles[$key];
+          ?>
+          <form method="post" style="margin:0;">
+            <input type="hidden" name="start_train" value="1">
+            <input type="hidden" name="plan" value="<?= $key ?>">
+            <button type="submit" style="
+              background:<?= $ps['bg'] ?>;border:1px solid <?= $ps['border'] ?>;
+              color:#fff;width:100%;padding:11px 14px;border-radius:7px;
+              cursor:pointer;font-size:13px;font-weight:bold;
+              display:flex;justify-content:space-between;align-items:center;">
+              <span><?= $ps['icon'] ?> <?= $plan['label'] ?>訓練</span>
+              <span style="font-size:12px;color:rgba(255,255,255,.8);"><?= $ps['desc'] ?></span>
+            </button>
+          </form>
+          <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <div id="cooldown-box" style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:7px;padding:13px;text-align:center;">
+          <div style="font-size:13px;color:#94a3b8;margin-bottom:6px;">⏳ 訓練冷卻中</div>
+          <div id="cd-timer" style="font-size:22px;font-weight:bold;color:#ffca28;"></div>
+          <div style="font-size:11px;color:#555;margin-top:6px;">冷卻結束後可再次選擇訓練</div>
+        </div>
+        <?php endif; ?>
 
         <form method="post" onsubmit="return confirm('⚠️ 警告：即將重置帳號！\n等級、屬性、金幣、塔層數將全部歸零。\n\n確定要重新開始嗎？');">
             <button type="submit" name="reset_account" class="btn-reset">🚨 重置帳號</button>
@@ -197,22 +223,23 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
 </div>
 
 <script>
-<?php if ($train_state === 'training'): ?>
-    let remainingCd = <?php echo $remaining_cd; ?>;
-    const trainBtn = document.getElementById('trainBtn');
-    const timer = setInterval(() => {
-        trainBtn.innerHTML = `💪 訓練中 剩餘 (${remainingCd}秒)`;
-        remainingCd--;
-        if (remainingCd < 0) {
-            clearInterval(timer);
-            window.location.href = 'index.php'; 
-        }
-    }, 1000);
-    trainBtn.innerHTML = `💪 訓練中 剩餘 (${remainingCd}秒)`;
+<?php if ($train_state === 'cooling'): ?>
+let cd = <?= $remaining_cd ?>;
+const timerEl = document.getElementById('cd-timer');
+function fmt(s) {
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+timerEl.textContent = fmt(cd);
+const t = setInterval(() => {
+    cd--;
+    if (cd <= 0) { clearInterval(t); location.reload(); return; }
+    timerEl.textContent = fmt(cd);
+}, 1000);
 <?php endif; ?>
-
-const currentFloorElement = document.getElementById('current-floor');
-if (currentFloorElement) currentFloorElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+const cur = document.getElementById('current-floor');
+if (cur) cur.scrollIntoView({ behavior:'auto', block:'center' });
 </script>
 
 </body>

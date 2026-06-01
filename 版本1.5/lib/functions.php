@@ -117,51 +117,92 @@ function calculate_escape($dodge_level = 0) {
 //  訓練邏輯
 // ════════════════════════════════════════
 
-define('TRAIN_COOLDOWN_SEC', 10);
-define('TRAIN_EXP_REWARD',   50);
-define('TRAIN_STAT_REWARD',   1);
-
 /**
- * 查詢訓練冷卻狀態
- * @return array ['can_claim','seconds_remaining','is_training']
+ * 訓練方案定義
+ * duration_sec = 冷卻秒數（點擊後需等多久才能再訓練）
+ * exp / stat   = 點擊後立即給予的獎勵
  */
-function check_training_cooldown($conn, $user_id) {
-    $row = $conn->query("SELECT last_train_time FROM users WHERE id=$user_id")->fetch_assoc();
-    if (!$row || !$row['last_train_time']) {
-        return ['can_claim' => false, 'seconds_remaining' => 0, 'is_training' => false];
-    }
-    $elapsed = time() - strtotime($row['last_train_time']);
-    $remaining = max(0, TRAIN_COOLDOWN_SEC - $elapsed);
+function get_train_plans() {
     return [
-        'can_claim'         => ($elapsed >= TRAIN_COOLDOWN_SEC),
-        'seconds_remaining' => $remaining,
-        'is_training'       => true,
+        'short'  => ['label' => '10 分鐘', 'duration_sec' =>   600, 'exp' =>   50, 'stat' =>  1],
+        'medium' => ['label' => '1 小時',  'duration_sec' =>  3600, 'exp' =>  300, 'stat' =>  3],
+        'long'   => ['label' => '8 小時',  'duration_sec' => 28800, 'exp' => 1500, 'stat' => 10],
     ];
 }
 
 /**
- * 開始訓練
+ * 查詢訓練冷卻狀態
+ * @return array ['is_training','seconds_remaining','duration_sec','plan_key']
  */
-function start_training($conn, $user_id) {
-    $conn->query("UPDATE users SET last_train_time=NOW() WHERE id=$user_id");
-    return ['started' => true, 'cooldown' => TRAIN_COOLDOWN_SEC];
+function check_training_cooldown($conn, $user_id) {
+    $row = $conn->query("SELECT last_train_time, train_duration FROM users WHERE id=$user_id")->fetch_assoc();
+    if (!$row || !$row['last_train_time']) {
+        return ['is_training' => false, 'seconds_remaining' => 0, 'duration_sec' => 0, 'plan_key' => ''];
+    }
+    $duration  = (int)$row['train_duration'];
+    $elapsed   = time() - strtotime($row['last_train_time']);
+    $remaining = max(0, $duration - $elapsed);
+
+    // 冷卻已過，自動清除
+    if ($elapsed >= $duration) {
+        $conn->query("UPDATE users SET last_train_time=NULL, train_duration=0 WHERE id=$user_id");
+        return ['is_training' => false, 'seconds_remaining' => 0, 'duration_sec' => 0, 'plan_key' => ''];
+    }
+
+    // 反推目前的方案 key
+    $plan_key = '';
+    foreach (get_train_plans() as $key => $plan) {
+        if ($plan['duration_sec'] === $duration) { $plan_key = $key; break; }
+    }
+
+    return [
+        'is_training'       => true,
+        'seconds_remaining' => $remaining,
+        'duration_sec'      => $duration,
+        'plan_key'          => $plan_key,
+    ];
 }
 
 /**
- * 領取訓練獎勵（含驗證冷卻）
- * @return array ['success','exp_gained','stat_gained','message']
+ * 開始訓練（立即發獎，啟動冷卻）
+ * @param string $plan_key  'short' | 'medium' | 'long'
+ * @return array ['success','exp_gained','stat_gained','duration_sec','message']
+ */
+function start_training($conn, $user_id, $plan_key = 'short') {
+    $plans = get_train_plans();
+    if (!isset($plans[$plan_key])) $plan_key = 'short';
+    $plan = $plans[$plan_key];
+
+    // 檢查是否還在冷卻中
+    $status = check_training_cooldown($conn, $user_id);
+    if ($status['is_training']) {
+        return ['success' => false, 'message' => "訓練冷卻中，剩餘 {$status['seconds_remaining']} 秒"];
+    }
+
+    $exp  = $plan['exp'];
+    $stat = $plan['stat'];
+    $dur  = $plan['duration_sec'];
+
+    // 立即發獎 + 記錄冷卻
+    $conn->query("UPDATE users SET last_train_time=NOW(), train_duration=$dur, exp=exp+$exp, stat_points=stat_points+$stat WHERE id=$user_id");
+    $conn->query("INSERT INTO training_logs (user_id,exp_gained,stat_points_gained) VALUES ($user_id,$exp,$stat)");
+
+    return [
+        'success'      => true,
+        'exp_gained'   => $exp,
+        'stat_gained'  => $stat,
+        'duration_sec' => $dur,
+        'label'        => $plan['label'],
+        'message'      => "訓練開始！獲得 {$exp} EXP 與 {$stat} 屬性點",
+    ];
+}
+
+/**
+ * 舊版相容：claim_training_reward 不再需要（獎勵改為立即發放）
+ * 保留以免其他地方呼叫時報錯
  */
 function claim_training_reward($conn, $user_id) {
-    $status = check_training_cooldown($conn, $user_id);
-    if (!$status['is_training']) {
-        return ['success' => false, 'message' => '尚未開始訓練'];
-    }
-    if (!$status['can_claim']) {
-        return ['success' => false, 'message' => "冷卻中，剩餘 {$status['seconds_remaining']} 秒", 'seconds_remaining' => $status['seconds_remaining']];
-    }
-    $conn->query("UPDATE users SET last_train_time=NULL, exp=exp+".TRAIN_EXP_REWARD.", stat_points=stat_points+".TRAIN_STAT_REWARD." WHERE id=$user_id");
-    $conn->query("INSERT INTO training_logs (user_id,exp_gained,stat_points_gained) VALUES ($user_id,".TRAIN_EXP_REWARD.",".TRAIN_STAT_REWARD.")");
-    return ['success' => true, 'exp_gained' => TRAIN_EXP_REWARD, 'stat_gained' => TRAIN_STAT_REWARD, 'message' => '訓練完成！'];
+    return ['success' => false, 'message' => '獎勵已在訓練開始時發放'];
 }
 
 // ════════════════════════════════════════

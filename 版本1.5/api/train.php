@@ -41,21 +41,10 @@ try {
             ];
             break;
 
-        // ── 開始訓練 ──
+        // ── 開始訓練（立即發獎）──
         case 'start_train':
-            $cooldown = check_training_cooldown($conn, $user_id);
-            if ($cooldown['is_training']) {
-                $result = ['success' => false, 'message' => '訓練已在進行中'];
-                $status = 'fail';
-                break;
-            }
-            $r = start_training($conn, $user_id);
-            $result = ['success' => true, 'message' => '訓練開始！', 'cooldown' => $r['cooldown']];
-            break;
-
-        // ── 屬性提升（領取獎勵） ──
-        case 'claim_reward':
-            $r = claim_training_reward($conn, $user_id);
+            $plan_key = $_REQUEST['plan'] ?? 'short';
+            $r = start_training($conn, $user_id, $plan_key);
             if ($r['success']) {
                 $lv = process_levelup($conn, $user_id);
                 $r['leveled_up']    = $lv['leveled_up'];
@@ -64,6 +53,12 @@ try {
             }
             $result = $r;
             if (!$r['success']) $status = 'fail';
+            break;
+
+        // ── claim_reward 已廢棄（獎勵改為開始時立即發放）──
+        case 'claim_reward':
+            $result = ['success' => false, 'message' => '獎勵已在訓練開始時發放，無需另外領取'];
+            $status = 'fail';
             break;
 
         // ── 屬性配點 ──

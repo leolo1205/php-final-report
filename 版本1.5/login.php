@@ -36,8 +36,8 @@ if (isset($_POST['type']) && $_POST['type'] === 'player') {
 
 // ── 管理員登入 ──
 if (isset($_POST['type']) && $_POST['type'] === 'admin') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $username = trim($_POST['admin_username'] ?? '');
+    $password = $_POST['admin_password'] ?? '';
 
     $stmt = $conn->prepare("SELECT id, username, password FROM admin_users WHERE username = ?");
     $stmt->bind_param('s', $username);
@@ -213,8 +213,8 @@ body{
     </form>
 
     <div class="hint">
-      新玩家預設密碼：<b>player123</b><br>
-      登入後可在設定中更改密碼
+      還沒有帳號？<a href="register.php" style="color:#4fc3f7;text-decoration:none;font-weight:600;">立即註冊</a><br>
+      <span style="margin-top:4px;display:inline-block;">註冊後直接進入遊戲，免重新登入</span>
     </div>
   </div>
 
@@ -236,14 +236,15 @@ body{
       <input type="hidden" name="type" value="admin">
       <div class="form-group">
         <label>管理員帳號</label>
-        <input type="text" name="username"
+        <input type="text" name="admin_username"
+               autocomplete="off"
                placeholder="admin"
-               value="<?= ($active==='admin') ? htmlspecialchars($_POST['username']??'') : '' ?>"
+               value="<?= ($active==='admin') ? htmlspecialchars($_POST['admin_username']??'') : '' ?>"
                required>
       </div>
       <div class="form-group">
         <label>密碼</label>
-        <input type="password" name="password" placeholder="••••••••" required>
+        <input type="password" name="admin_password" autocomplete="new-password" placeholder="••••••••" required>
       </div>
       <button type="submit" class="btn-submit">進入後台</button>
     </form>
