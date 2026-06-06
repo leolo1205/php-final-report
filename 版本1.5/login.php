@@ -6,31 +6,59 @@ if (isset($_SESSION['player_id']))       { header('Location: index.php');       
 if (isset($_SESSION['admin_logged_in'])) { header('Location: admin/index.php'); exit; }
 
 require_once 'db.php';
+require_once 'lib/session.php';
 
 $player_error = '';
 $admin_error  = '';
+
+// ── 速率限制工具（以 Session 為基礎，以 IP 為 key） ──
+function _rl_get(string $prefix): array {
+    $key = $prefix . '_' . md5($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!isset($_SESSION[$key])) $_SESSION[$key] = ['fails' => 0, 'since' => 0];
+    if ($_SESSION[$key]['fails'] > 0 && (time() - $_SESSION[$key]['since']) >= 900) {
+        $_SESSION[$key] = ['fails' => 0, 'since' => 0]; // 15 分鐘後自動解鎖
+    }
+    return [$key, $_SESSION[$key]];
+}
+function _rl_fail(string $key): void {
+    $_SESSION[$key]['fails']++;
+    if ($_SESSION[$key]['fails'] === 1) $_SESSION[$key]['since'] = time();
+}
+function _rl_ok(string $key): void { $_SESSION[$key] = ['fails' => 0, 'since' => 0]; }
+function _rl_locked(array $rl): bool { return $rl['fails'] >= 5; }
+function _rl_wait(array $rl): int { return (int)ceil((900 - (time() - $rl['since'])) / 60); }
 
 // ── 玩家登入 ──
 if (isset($_POST['type']) && $_POST['type'] === 'player') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    $stmt = $conn->prepare("SELECT id, username, password, is_banned FROM users WHERE username = ?");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $player = $stmt->get_result()->fetch_assoc();
+    [$rl_key, $rl] = _rl_get('rl_player');
 
-    if (!$player) {
-        $player_error = '找不到此玩家帳號';
-    } elseif ($player['is_banned']) {
-        $player_error = '此帳號已被封鎖，請聯絡管理員';
-    } elseif (!password_verify($password, $player['password'])) {
-        $player_error = '密碼錯誤，請重試';
+    if (_rl_locked($rl)) {
+        $player_error = '登入失敗次數過多，請等待 ' . _rl_wait($rl) . ' 分鐘後再試。';
     } else {
-        $_SESSION['player_id']   = $player['id'];
-        $_SESSION['player_name'] = $player['username'];
-        header('Location: index.php');
-        exit;
+        $stmt = $conn->prepare("SELECT id, username, password, is_banned FROM users WHERE username = ?");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $player = $stmt->get_result()->fetch_assoc();
+
+        if (!$player) {
+            $player_error = '找不到此玩家帳號';
+            _rl_fail($rl_key);
+        } elseif ($player['is_banned']) {
+            $player_error = '此帳號已被封鎖，請聯絡管理員';
+        } elseif (!password_verify($password, $player['password'])) {
+            $player_error = '密碼錯誤，請重試';
+            _rl_fail($rl_key);
+        } else {
+            _rl_ok($rl_key);
+            session_regenerate_id(true);
+            $_SESSION['player_id']   = $player['id'];
+            $_SESSION['player_name'] = $player['username'];
+            header('Location: index.php');
+            exit;
+        }
     }
 }
 
@@ -39,19 +67,28 @@ if (isset($_POST['type']) && $_POST['type'] === 'admin') {
     $username = trim($_POST['admin_username'] ?? '');
     $password = $_POST['admin_password'] ?? '';
 
-    $stmt = $conn->prepare("SELECT id, username, password FROM admin_users WHERE username = ?");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $admin = $stmt->get_result()->fetch_assoc();
+    [$rl_key, $rl] = _rl_get('rl_admin');
 
-    if ($admin && password_verify($password, $admin['password'])) {
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_id']        = $admin['id'];
-        $_SESSION['admin_user']      = $admin['username'];
-        header('Location: admin/index.php');
-        exit;
+    if (_rl_locked($rl)) {
+        $admin_error = '登入失敗次數過多，請等待 ' . _rl_wait($rl) . ' 分鐘後再試。';
+    } else {
+        $stmt = $conn->prepare("SELECT id, username, password FROM admin_users WHERE username = ?");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $admin = $stmt->get_result()->fetch_assoc();
+
+        if ($admin && password_verify($password, $admin['password'])) {
+            _rl_ok($rl_key);
+            session_regenerate_id(true);
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_id']        = $admin['id'];
+            $_SESSION['admin_user']      = $admin['username'];
+            header('Location: admin/index.php');
+            exit;
+        }
+        $admin_error = '管理員帳號或密碼錯誤';
+        _rl_fail($rl_key);
     }
-    $admin_error = '管理員帳號或密碼錯誤';
 }
 
 $active = (isset($_POST['type']) && $_POST['type'] === 'admin') ? 'admin' : 'player';

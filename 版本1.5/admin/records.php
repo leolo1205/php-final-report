@@ -10,6 +10,16 @@ $page     = max(1, (int)($_GET['page'] ?? 1));
 $per_page = 20;
 $offset   = ($page - 1) * $per_page;
 
+// 白名單：只允許合法的 result 值
+$allowed_results = ['win', 'lose', 'escape'];
+if (!in_array($result_flt, $allowed_results, true)) $result_flt = '';
+
+// 日期格式強制標準化，防止 SQL 注入
+if ($date_flt !== '') {
+    $ts = strtotime($date_flt);
+    $date_flt = $ts ? date('Y-m-d', $ts) : '';
+}
+
 // ── 玩家清單（供篩選下拉） ──
 $players_list = $conn->query("SELECT id, username FROM users ORDER BY username");
 
@@ -17,7 +27,7 @@ $players_list = $conn->query("SELECT id, username FROM users ORDER BY username")
 function build_where($uid, $date, $extra=[]) {
     $w = [];
     if ($uid > 0) $w[] = "user_id=$uid";
-    if ($date)   $w[] = "DATE(created_at)='".date('Y-m-d', strtotime($date))."'";
+    if ($date)   $w[] = "DATE(created_at)='$date'";
     foreach ($extra as $e) $w[] = $e;
     return $w ? 'WHERE '.implode(' AND ', $w) : '';
 }

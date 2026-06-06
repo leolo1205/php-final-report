@@ -1,6 +1,9 @@
 <?php
 require_once 'auth.php';
 require_once '../db.php';
+require_once '../lib/session.php';
+$_api_base = rtrim(BASE_URL, '/') . '/api';
+$_csrf     = csrf_token();
 
 function q_val($conn, $sql) {
     $r = $conn->query($sql);
@@ -243,6 +246,7 @@ if ($logs_res) {
 </div><!-- /main -->
 
 <script>
+const _csrfToken = '<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>';
 const API_DEFS = {
   train: {
     cooldown_check: [],
@@ -333,7 +337,11 @@ async function runTest() {
 
   const t0 = performance.now();
   try {
-    const resp = await fetch(`/targame/api/${api}.php`, { method:'POST', body });
+    const resp = await fetch(`<?= htmlspecialchars($_api_base, ENT_QUOTES, 'UTF-8') ?>/${api}.php`, {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': _csrfToken },
+      body
+    });
     const ms = Math.round(performance.now() - t0);
     const data = await resp.json();
     pre.textContent = JSON.stringify(data, null, 2);

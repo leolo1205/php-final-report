@@ -382,7 +382,7 @@ function ensure_pvp_ranking($conn, $user_id) {
 }
 
 /**
- * 取得玩家完整 PVP 資料（含裝備加成、技能）
+ * 取得玩家完整 PVP 資料（含裝備加成、被動技能、技能樹數值加成）
  */
 function get_pvp_fighter($conn, $user_id) {
     $u  = $conn->query("SELECT id,username,dmg,def,hp,max_hp,level FROM users WHERE id=$user_id")->fetch_assoc();
@@ -393,27 +393,35 @@ function get_pvp_fighter($conn, $user_id) {
         if ($row['skill_id']==='dodge') $dodge_lvl = (int)$row['level'];
         if ($row['skill_id']==='crit')  $crit_lvl  = (int)$row['level'];
     }
+    $build = get_skill_build($conn, $user_id);
+    $sb    = get_skill_stat_bonus($build);
     return [
         'id'         => (int)$u['id'],
         'username'   => $u['username'],
         'level'      => (int)$u['level'],
-        'hp'         => (int)$u['max_hp'] + $eq['hp'],
-        'max_hp'     => (int)$u['max_hp'] + $eq['hp'],
-        'atk'        => (int)$u['dmg']    + $eq['atk'],
-        'def'        => (int)$u['def']    + $eq['def'],
-        'crit_rate'  => 10 + $crit_lvl,
+        'hp'         => (int)$u['max_hp'] + $eq['hp'] + $sb['hp'],
+        'max_hp'     => (int)$u['max_hp'] + $eq['hp'] + $sb['hp'],
+        'atk'        => (int)$u['dmg']    + $eq['atk'] + $sb['atk'],
+        'def'        => (int)$u['def']    + $eq['def'] + $sb['def'],
+        'crit_rate'  => 10 + $crit_lvl + $sb['crit'],
         'dodge_rate' => 10 + $dodge_lvl,
+        'build'      => $build,   // 技能樹 build，供戰鬥技能使用
     ];
 }
 
 /**
- * 模擬 PVP 戰鬥，回傳完整結果
+ * 模擬 PVP 戰鬥（含技能樹效果），回傳完整結果
  */
 function simulate_pvp_battle($conn, $challenger_id, $defender_id) {
     $a = get_pvp_fighter($conn, $challenger_id);
     $b = get_pvp_fighter($conn, $defender_id);
 
-    // 先攻判定（閃避率高者先攻，相同則隨機）
+    // 各自的技能戰鬥狀態與侵蝕層數
+    $ss_a = skill_combat_init();  $ss_b = skill_combat_init();
+    $corr_on_b = 0;  // a 對 b 的侵蝕層數
+    $corr_on_a = 0;  // b 對 a 的侵蝕層數
+
+    // 先攻判定
     if ($a['dodge_rate'] > $b['dodge_rate'])      $first = 'a';
     elseif ($b['dodge_rate'] > $a['dodge_rate'])  $first = 'b';
     else $first = (rand(0,1) ? 'a' : 'b');
@@ -422,27 +430,91 @@ function simulate_pvp_battle($conn, $challenger_id, $defender_id) {
     $log[] = ['type'=>'system', 'text'=>
         "⚔️ {$a['username']}（Lv.{$a['level']}）VS {$b['username']}（Lv.{$b['level']}）"];
     $log[] = ['type'=>'system', 'text'=>
-        ($first==='a' ? "🎯 {$a['username']}" : "🎯 {$b['username']}") . " 閃避率較高，先手出擊！"];
+        ($first==='a' ? "🎯 {$a['username']}" : "🎯 {$b['username']}") . " 先手出擊！"];
 
     $round = 0;
     $order = ($first === 'a') ? ['a','b'] : ['b','a'];
 
-    while ($a['hp'] > 0 && $b['hp'] > 0) {
+    while ($a['hp'] > 0 && $b['hp'] > 0 && $round < 200) {
         $round++;
+
+        // ── 回合開始：技能效果 ──
+        foreach (['a','b'] as $side) {
+            $f   = &$$side;
+            $ss  = $side === 'a' ? $ss_a : $ss_b;
+            $rs  = skill_round_start($f['build'], $ss, $f['hp'], $f['max_hp']);
+            $opp = $side === 'a' ? 'b' : 'a';
+            if ($rs['heal'] > 0) {
+                $f['hp'] = min($f['max_hp'], $f['hp'] + $rs['heal']);
+                $log[] = ['type'=>'system', 'text' => "🌿 {$f['username']} 生命脈動 +{$rs['heal']} HP"];
+            }
+            if ($rs['reflect'] > 0) {
+                $$opp['hp'] -= $rs['reflect'];
+                $log[] = ['type'=>'system', 'text' => "🌵 {$f['username']} 荊棘爆發！{${$opp}['username']} 受到 {$rs['reflect']} 傷害"];
+            }
+            if ($side === 'a') $ss_a = $ss; else $ss_b = $ss;
+            unset($f);
+        }
+        if ($a['hp'] <= 0 || $b['hp'] <= 0) break;
+
+        // ── 攻守回合 ──
         foreach ($order as $turn) {
             if ($a['hp'] <= 0 || $b['hp'] <= 0) break;
-            [$atk_f, $def_f] = ($turn==='a') ? [$a,$b] : [$b,$a];
-            $hit = calculate_damage($atk_f['atk'], $def_f['def'], $atk_f['crit_rate'], $def_f['dodge_rate']);
+
+            [$atk_f, $def_f, $ss_atk, $ss_def, $corr_ref] = $turn === 'a'
+                ? [$a, $b, &$ss_a, &$ss_b, &$corr_on_b]
+                : [$b, $a, &$ss_b, &$ss_a, &$corr_on_a];
+
+            // 報復之刃：本回合必爆
+            $crit_r = $atk_f['crit_rate'];
+            if ($ss_atk['vengeance_ready']) { $crit_r = 100; $ss_atk['vengeance_ready'] = false; }
+
+            // 侵蝕削減後的有效防禦
+            $eff_def = skill_get_effective_def($def_f['build'], $def_f['hp'], $def_f['max_hp'],
+                                               max(0, $def_f['def'] - $corr_ref));
+
+            // 獵殺本能加成
+            $hunt = skill_hunting_bonus($atk_f['build'], $def_f['hp'], $def_f['max_hp']);
+            $eff_atk = (int)($atk_f['atk'] * (1 + $hunt));
+
+            $hit = calculate_damage($eff_atk, $eff_def, $crit_r, $def_f['dodge_rate']);
+
             if ($hit['dodged']) {
-                $log[] = ['type'=>'dodge', 'text'=>
-                    "💨 {$def_f['username']} 閃避了 {$atk_f['username']} 的攻擊！"];
+                $log[] = ['type'=>'dodge', 'text'=>"💨 {$def_f['username']} 閃避了 {$atk_f['username']} 的攻擊！"];
             } else {
-                if ($turn==='a') $b['hp'] -= $hit['damage'];
-                else             $a['hp'] -= $hit['damage'];
-                $remaining = max(0, ($turn==='a') ? $b['hp'] : $a['hp']);
+                if ($turn==='a') $b['hp'] -= $hit['damage']; else $a['hp'] -= $hit['damage'];
                 $prefix = $hit['crit'] ? "💥 爆擊！" : "";
+                $remaining = max(0, ($turn==='a') ? $b['hp'] : $a['hp']);
                 $log[] = ['type'=>($hit['crit']?'crit':'attack'), 'text'=>
                     "{$prefix}{$atk_f['username']} 造成 {$hit['damage']} 傷害。{$def_f['username']} 剩餘 HP：{$remaining}"];
+
+                // 攻擊技能效果
+                $sa = skill_on_player_attack($atk_f['build'], $ss_atk, $hit,
+                                             $def_f['hp'], $def_f['max_hp'], $corr_ref);
+                if ($sa['extra'] > 0) {
+                    if ($turn==='a') $b['hp'] -= $sa['extra']; else $a['hp'] -= $sa['extra'];
+                    $log[] = ['type'=>'system', 'text' => "{$atk_f['username']} {$sa['log']}"];
+                }
+
+                // 受傷技能效果
+                $dtaken = $hit['damage'];
+                $take_r = skill_on_player_take_dmg($def_f['build'], $ss_def, $hit, $dtaken);
+                if ($take_r['log']) {
+                    $log[] = ['type'=>'system', 'text' => "{$def_f['username']} {$take_r['log']}"];
+                }
+            }
+
+            // 不滅之軀
+            foreach (['a','b'] as $side) {
+                if ($$side['hp'] <= 0) {
+                    $ss_check = $side === 'a' ? $ss_a : $ss_b;
+                    $ud = skill_check_undying($$side['build'], $ss_check, $$side['max_hp']);
+                    if ($ud['revived']) {
+                        $$side['hp'] = $ud['new_hp'];
+                        $log[] = ['type'=>'system', 'text' => $ud['log']];
+                    }
+                    if ($side === 'a') $ss_a = $ss_check; else $ss_b = $ss_check;
+                }
             }
         }
     }
@@ -558,6 +630,219 @@ function pvp_weekly_settle($conn) {
     // 重置真人玩家積分為 1000（電腦玩家不重置）
     $conn->query("UPDATE pvp_rankings r JOIN users u ON r.user_id=u.id SET r.rating=1000, r.wins=0, r.losses=0, r.streak=0 WHERE u.is_bot=0");
     return ['settled' => count($players), 'rewarded' => $rewarded];
+}
+
+// ════════════════════════════════════════
+//  技能樹系統
+// ════════════════════════════════════════
+
+/**
+ * 各節點解鎖費用（線性成長，共 9 節點，總計 50,000 金）
+ */
+function get_node_costs() {
+    return [1 => 1500, 2 => 2500, 3 => 3500, 4 => 4500,
+            5 => 5500, 6 => 6500, 7 => 7500, 8 => 8500, 9 => 10000];
+}
+
+/**
+ * 三流派各 9 個節點定義
+ * type: 'stat'（數值節點）或 'skill'（技能節點）
+ */
+function get_archetype_nodes() {
+    return [
+        'assault' => [
+            1 => ['type'=>'stat',  'label'=>'ATK +3',      'atk'=>3],
+            2 => ['type'=>'stat',  'label'=>'ATK +3',      'atk'=>3],
+            3 => ['type'=>'skill', 'label'=>'🩸 血肉渴望', 'skill'=>'blood_thirst',      'desc'=>'每次攻擊追加敵方最大HP×1.4%真實傷害'],
+            4 => ['type'=>'stat',  'label'=>'ATK +5',      'atk'=>5],
+            5 => ['type'=>'stat',  'label'=>'爆擊率 +5%',  'crit'=>5],
+            6 => ['type'=>'skill', 'label'=>'💀 穿心一擊', 'skill'=>'pierce_heart',      'desc'=>'每4回合造成敵方最大HP×8%真實傷害'],
+            7 => ['type'=>'stat',  'label'=>'ATK +5',      'atk'=>5],
+            8 => ['type'=>'stat',  'label'=>'爆擊率 +5%',  'crit'=>5],
+            9 => ['type'=>'skill', 'label'=>'🔥 獵殺本能', 'skill'=>'hunting_instinct',  'desc'=>'敵方HP<60%傷害+15%，HP<25%再+15%'],
+        ],
+        'guardian' => [
+            1 => ['type'=>'stat',  'label'=>'DEF +2',      'def'=>2],
+            2 => ['type'=>'stat',  'label'=>'DEF +2',      'def'=>2],
+            3 => ['type'=>'skill', 'label'=>'🌵 荊棘之壁', 'skill'=>'thorn_wall',        'desc'=>'受傷時積累荊棘值，每4回合反彈積累×62%'],
+            4 => ['type'=>'stat',  'label'=>'DEF +3',      'def'=>3],
+            5 => ['type'=>'stat',  'label'=>'HP +20',      'hp'=>20],
+            6 => ['type'=>'skill', 'label'=>'⚙️ 鋼鐵意志', 'skill'=>'iron_will',         'desc'=>'HP低於40%時防禦力×1.3'],
+            7 => ['type'=>'stat',  'label'=>'DEF +3',      'def'=>3],
+            8 => ['type'=>'stat',  'label'=>'HP +20',      'hp'=>20],
+            9 => ['type'=>'skill', 'label'=>'⚡ 報復之刃', 'skill'=>'vengeance_blade',   'desc'=>'被暴擊後下次攻擊必定暴擊'],
+        ],
+        'vitality' => [
+            1 => ['type'=>'stat',  'label'=>'HP +20',      'hp'=>20],
+            2 => ['type'=>'stat',  'label'=>'HP +20',      'hp'=>20],
+            3 => ['type'=>'skill', 'label'=>'🌿 生命脈動', 'skill'=>'life_pulse',        'desc'=>'每回合恢復最大HP×4%'],
+            4 => ['type'=>'stat',  'label'=>'HP +30',      'hp'=>30],
+            5 => ['type'=>'stat',  'label'=>'DEF +1',      'def'=>1],
+            6 => ['type'=>'skill', 'label'=>'🧪 侵蝕詛咒', 'skill'=>'corrosion_curse',   'desc'=>'每次攻擊削減敵方DEF-3(上限-30)，追加層數×1.15真傷'],
+            7 => ['type'=>'stat',  'label'=>'HP +30',      'hp'=>30],
+            8 => ['type'=>'stat',  'label'=>'DEF +2',      'def'=>2],
+            9 => ['type'=>'skill', 'label'=>'🔮 不滅之軀', 'skill'=>'undying_body',      'desc'=>'HP首次歸零時復活至25%，下次受傷減半'],
+        ],
+    ];
+}
+
+/** 取得玩家技能樹資料，無資料時回傳預設值 */
+function get_skill_build($conn, $user_id) {
+    $row = $conn->query("SELECT archetype, nodes_unlocked FROM user_skill_build WHERE user_id=$user_id")->fetch_assoc();
+    return $row ?: ['archetype' => null, 'nodes_unlocked' => 0];
+}
+
+/** 計算已解鎖數值節點的屬性加總 */
+function get_skill_stat_bonus($build) {
+    $bonus = ['atk' => 0, 'def' => 0, 'hp' => 0, 'crit' => 0];
+    if (!$build['archetype'] || $build['nodes_unlocked'] <= 0) return $bonus;
+    $nodes = get_archetype_nodes()[$build['archetype']] ?? [];
+    for ($i = 1; $i <= (int)$build['nodes_unlocked']; $i++) {
+        $n = $nodes[$i] ?? [];
+        if (($n['type'] ?? '') === 'stat') {
+            foreach (['atk','def','hp','crit'] as $k) {
+                if (isset($n[$k])) $bonus[$k] += $n[$k];
+            }
+        }
+    }
+    return $bonus;
+}
+
+/** 確認指定技能是否在已解鎖節點內 */
+function has_skill($build, $skill_name) {
+    if (!$build['archetype'] || $build['nodes_unlocked'] <= 0) return false;
+    $nodes = get_archetype_nodes()[$build['archetype']] ?? [];
+    for ($i = 1; $i <= (int)$build['nodes_unlocked']; $i++) {
+        if (($nodes[$i]['skill'] ?? '') === $skill_name) return true;
+    }
+    return false;
+}
+
+/** 初始化戰鬥技能狀態 */
+function skill_combat_init() {
+    return [
+        'round'           => 0,
+        'thorns_acc'      => 0,
+        'pierce_cd'       => 0,
+        'corr_stacks'     => 0,
+        'vengeance_ready' => false,
+        'undying_used'    => false,
+        'undying_immune'  => false,
+    ];
+}
+
+/**
+ * 每回合開始時的技能效果
+ * @return array ['heal'=>int, 'reflect'=>int, 'log'=>string]
+ */
+function skill_round_start($build, &$ss, $my_hp, $my_max_hp) {
+    $heal = $reflect = 0; $log = '';
+    $ss['round']++;
+    if (!$build['archetype']) return compact('heal','reflect','log');
+
+    // 生命脈動（血量流 節點3）
+    if (has_skill($build, 'life_pulse')) {
+        $heal = max(1, (int)($my_max_hp * 0.04));
+        $log .= "🌿 生命脈動：回復 {$heal} HP。";
+    }
+    // 荊棘之壁爆發（防禦流 節點3，每4回合）
+    if (has_skill($build, 'thorn_wall') && $ss['round'] % 4 === 0 && $ss['thorns_acc'] > 0) {
+        $reflect = (int)($ss['thorns_acc'] * 0.62);
+        $log .= "🌵 荊棘之壁爆發：反彈 {$reflect} 傷害！";
+        $ss['thorns_acc'] = 0;
+    }
+    return compact('heal','reflect','log');
+}
+
+/**
+ * 玩家攻擊命中後的技能效果
+ * @param array  $hit_result  calculate_damage() 的回傳值
+ * @param int    &$enemy_corr 侵蝕層數（傳址，函式內累積）
+ * @return array ['extra'=>int, 'log'=>string]
+ */
+function skill_on_player_attack($build, &$ss, $hit_result, $enemy_hp, $enemy_max_hp, &$enemy_corr) {
+    $extra = 0; $log = '';
+    if (!$build['archetype'] || !$hit_result['hit']) return compact('extra','log');
+
+    // 血肉渴望：1.4% 敵方最大HP 真傷
+    if (has_skill($build, 'blood_thirst')) {
+        $td = max(1, (int)($enemy_max_hp * 0.014));
+        $extra += $td;
+        $log .= "🩸 血肉渴望：真傷 {$td}。";
+    }
+    // 穿心一擊：每4回合 8% 最大HP 真傷
+    if (has_skill($build, 'pierce_heart')) {
+        $ss['pierce_cd']++;
+        if ($ss['pierce_cd'] >= 4) {
+            $ss['pierce_cd'] = 0;
+            $td = max(1, (int)($enemy_max_hp * 0.08));
+            $extra += $td;
+            $log .= "💀 穿心一擊：真傷 {$td}！";
+        }
+    }
+    // 侵蝕詛咒：DEF -3（上限30層），層數×1.15 真傷
+    if (has_skill($build, 'corrosion_curse')) {
+        $enemy_corr = min(30, $enemy_corr + 3);
+        $td = (int)($enemy_corr * 1.15);
+        $extra += $td;
+        $log .= "🧪 侵蝕：DEF -{$enemy_corr}，追加真傷 {$td}。";
+    }
+    return compact('extra','log');
+}
+
+/**
+ * 玩家受到攻擊後的技能效果
+ * @return array ['log'=>string]
+ */
+function skill_on_player_take_dmg($build, &$ss, $hit_result, $dmg_taken) {
+    $log = '';
+    if (!$build['archetype'] || !$hit_result['hit']) return ['log'=>$log];
+
+    // 荊棘之壁積累
+    if (has_skill($build, 'thorn_wall') && $dmg_taken > 0) {
+        $ss['thorns_acc'] += $dmg_taken;
+    }
+    // 報復之刃：被暴擊後下次攻擊必爆
+    if (has_skill($build, 'vengeance_blade') && $hit_result['crit']) {
+        $ss['vengeance_ready'] = true;
+        $log .= "⚡ 報復之刃就緒！";
+    }
+    return ['log' => $log];
+}
+
+/**
+ * 計算有效防禦（鋼鐵意志：HP < 40% 時 DEF × 1.3）
+ */
+function skill_get_effective_def($build, $my_hp, $my_max_hp, $base_def) {
+    if (!has_skill($build, 'iron_will') || $my_max_hp <= 0) return $base_def;
+    return ($my_hp / $my_max_hp) < 0.40 ? (int)($base_def * 1.3) : $base_def;
+}
+
+/**
+ * 獵殺本能傷害加成倍率（0.0 / 0.15 / 0.30）
+ */
+function skill_hunting_bonus($build, $enemy_hp, $enemy_max_hp) {
+    if (!has_skill($build, 'hunting_instinct') || $enemy_max_hp <= 0) return 0.0;
+    $pct = $enemy_hp / $enemy_max_hp;
+    $b = 0.0;
+    if ($pct < 0.60) $b += 0.15;
+    if ($pct < 0.25) $b += 0.15;
+    return $b;
+}
+
+/**
+ * 不滅之軀死亡攔截
+ * @return array ['revived'=>bool, 'new_hp'=>int, 'log'=>string]
+ */
+function skill_check_undying($build, &$ss, $my_max_hp) {
+    if (!has_skill($build, 'undying_body') || $ss['undying_used']) {
+        return ['revived' => false, 'new_hp' => 0, 'log' => ''];
+    }
+    $new_hp = max(1, (int)($my_max_hp * 0.25));
+    $ss['undying_used']   = true;
+    $ss['undying_immune'] = true;
+    return ['revived' => true, 'new_hp' => $new_hp,
+            'log' => "🔮 不滅之軀：從死亡邊緣復活！回復 {$new_hp} HP，下次受傷減半！"];
 }
 
 // ════════════════════════════════════════

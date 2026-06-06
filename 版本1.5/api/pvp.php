@@ -9,6 +9,13 @@ $user_id = get_player_id();
 if (!$user_id) { echo json_encode(['success'=>false,'message'=>'未登入']); exit; }
 
 $action = trim($_REQUEST['action'] ?? '');
+
+// 挑戰等寫入操作需驗證 CSRF
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify()) {
+    echo json_encode(['success'=>false,'message'=>'安全驗證失敗','code'=>403]);
+    exit;
+}
+
 $result = [];
 
 try {
@@ -61,7 +68,8 @@ try {
             $result = ['success'=>false,'message'=>'未知的 action'];
     }
 } catch (Exception $e) {
-    $result = ['success'=>false,'message'=>'伺服器錯誤：'.$e->getMessage()];
+    error_log('pvp.php exception: ' . $e->getMessage());
+    $result = ['success'=>false,'message'=>'伺服器發生錯誤，請稍後再試'];
 }
 
 $result['_ms'] = (int)((microtime(true)-$t_start)*1000);

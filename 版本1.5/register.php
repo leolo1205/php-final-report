@@ -3,10 +3,14 @@ session_start();
 if (isset($_SESSION['player_id'])) { header('Location: index.php'); exit; }
 
 require_once 'db.php';
+require_once 'lib/session.php';
 
 $error   = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_verify()) {
+        die('安全驗證失敗，請重新整理頁面後再試。');
+    }
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm  = $_POST['confirm']  ?? '';
@@ -31,7 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('ss', $username, $hash);
             if ($stmt->execute()) {
                 $new_id = $conn->insert_id;
-                $conn->query("INSERT IGNORE INTO pvp_rankings (user_id, rating, wins, losses, streak) VALUES ($new_id, 1000, 0, 0, 0)");
+                $pvp = $conn->prepare("INSERT IGNORE INTO pvp_rankings (user_id, rating, wins, losses, streak) VALUES (?, 1000, 0, 0, 0)");
+                $pvp->bind_param('i', $new_id);
+                $pvp->execute();
+                $pvp->close();
+                session_regenerate_id(true);
                 $_SESSION['player_id']   = $new_id;
                 $_SESSION['player_name'] = $username;
                 header('Location: index.php');
@@ -118,6 +126,7 @@ body{
   </div>
 
   <form method="POST" autocomplete="off">
+    <?= csrf_field() ?>
     <div class="form-group">
       <label>角色名稱</label>
       <input type="text" name="username"

@@ -2,6 +2,7 @@
 session_start();
 date_default_timezone_set('Asia/Taipei');
 require 'db.php';
+require_once 'lib/session.php';
 require_once 'lib/functions.php';
 require 'tower_story.php';
 require 'tower_monsters.php';
@@ -48,6 +49,7 @@ $new_log = ""; $old_log = $run['log'];
 
 // 處理 POST 抉擇
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if (!csrf_verify()) { die('安全驗證失敗，請重新整理頁面後再試。'); }
     $action = $_POST['action']; $node = $run['node'];
     $post_new = "<div class='node-box reveal-item hidden-item' data-delay='100'>"; $post_old = "<div class='node-box'>";
     $add_post_line = function($text, $delay=800) use (&$post_new, &$post_old) {
@@ -189,18 +191,24 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
     // 處理技能升級
     if (isset($run['skill_gains']) && !empty($run['skill_gains'])) {
         foreach ($run['skill_gains'] as $s_id => $gained_exp) {
+            if (!in_array($s_id, ['crit', 'dodge'], true)) continue;
             if ($s_id === 'crit') $crit_gain_display = $gained_exp;
             if ($s_id === 'dodge') $dodge_gain_display = $gained_exp;
-            
-            $row = $conn->query("SELECT level, exp FROM user_skills WHERE user_id=$user_id AND skill_id='$s_id'")->fetch_assoc();
-            $s_lvl = $row['level'] ?? 0; 
-            $s_exp = ($row['exp'] ?? 0) + $gained_exp;
-            
-            while ($s_exp >= ($s_lvl + 1) * 10) { 
-                $s_exp -= ($s_lvl + 1) * 10; 
-                $s_lvl++; 
-            }
-            $conn->query("INSERT INTO user_skills (user_id, skill_id, level, exp) VALUES ($user_id, '$s_id', $s_lvl, $s_exp) ON DUPLICATE KEY UPDATE level = $s_lvl, exp = $s_exp");
+
+            $sel = $conn->prepare("SELECT level, exp FROM user_skills WHERE user_id=? AND skill_id=?");
+            $sel->bind_param('is', $user_id, $s_id);
+            $sel->execute();
+            $row = $sel->get_result()->fetch_assoc();
+            $sel->close();
+
+            $s_lvl = (int)($row['level'] ?? 0);
+            $s_exp = (int)($row['exp']   ?? 0) + $gained_exp;
+            while ($s_exp >= ($s_lvl + 1) * 10) { $s_exp -= ($s_lvl + 1) * 10; $s_lvl++; }
+
+            $ins = $conn->prepare("INSERT INTO user_skills (user_id, skill_id, level, exp) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE level=VALUES(level), exp=VALUES(exp)");
+            $ins->bind_param('isis', $user_id, $s_id, $s_lvl, $s_exp);
+            $ins->execute();
+            $ins->close();
         }
     }
     

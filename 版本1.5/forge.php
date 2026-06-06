@@ -6,6 +6,7 @@ require_once 'lib/session.php';
 require_once 'lib/functions.php';
 
 if (!isset($_SESSION['player_id'])) { header('Location: login.php'); exit; }
+$_csrf = csrf_token();
 $user_id = (int)$_SESSION['player_id'];
 $user    = $conn->query("SELECT username, gold FROM users WHERE id=$user_id")->fetch_assoc();
 $eq      = get_equipment($conn, $user_id);
@@ -23,6 +24,7 @@ $equip_info = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>鍛造 — 塔城傳說</title>
+<meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;color:#e0e0e0;padding:20px;}
@@ -195,6 +197,8 @@ function switchTab(type) {
     document.querySelectorAll('.tab')[idx].classList.add('active');
 }
 
+const _csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
 async function doUpgrade(type) {
     const btn    = document.getElementById('btn-'+type);
     const resBox = document.getElementById('result-'+type);
@@ -203,7 +207,7 @@ async function doUpgrade(type) {
 
     const resp = await fetch('api/forge.php', {
         method: 'POST',
-        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+        headers: {'Content-Type':'application/x-www-form-urlencoded', 'X-CSRF-Token': _csrfToken},
         body: `action=upgrade&type=${type}`
     });
     const data = await resp.json();

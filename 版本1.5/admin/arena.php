@@ -5,6 +5,9 @@ require_once '../lib/functions.php';
 
 $msg = '';
 if (isset($_POST['weekly_settle'])) {
+    if (!csrf_verify()) {
+        die('安全驗證失敗，請重新整理頁面後再試。');
+    }
     $r = pvp_weekly_settle($conn);
     $msg = "✅ 週結算完成！共 {$r['settled']} 位玩家，{$r['rewarded']} 位獲得獎勵。";
 }
@@ -50,6 +53,7 @@ while ($r = $res->fetch_assoc()) $recent[] = $r;
         <div class="value" style="font-size:18px;">每週一 0:00</div>
         <div class="sub">
           <form method="POST" style="margin-top:8px;" onsubmit="return confirm('確定執行週結算？此操作將發放金幣並重置所有積分。');">
+            <?= csrf_field() ?>
             <button type="submit" name="weekly_settle" class="btn btn-danger" style="width:100%;">立即執行結算</button>
           </form>
         </div>

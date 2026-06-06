@@ -17,6 +17,11 @@ if (!$user_id) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify()) {
+    echo json_encode(['success' => false, 'message' => '安全驗證失敗', 'code' => 403]);
+    exit;
+}
+
 $action = trim($_REQUEST['action'] ?? '');
 $result = [];
 $status = 'success';
@@ -103,11 +108,18 @@ try {
             $skill_updates = [];
             foreach (['crit' => $crit_exp, 'dodge' => $dodge_exp] as $sid => $gained) {
                 if ($gained <= 0) continue;
-                $row = $conn->query("SELECT level,exp FROM user_skills WHERE user_id=$user_id AND skill_id='$sid'")->fetch_assoc();
+                $sel = $conn->prepare("SELECT level,exp FROM user_skills WHERE user_id=? AND skill_id=?");
+                $sel->bind_param('is', $user_id, $sid);
+                $sel->execute();
+                $row = $sel->get_result()->fetch_assoc();
+                $sel->close();
                 $slvl = (int)($row['level'] ?? 0);
                 $sexp = (int)($row['exp']   ?? 0) + $gained;
                 while ($sexp >= ($slvl + 1) * 10) { $sexp -= ($slvl + 1) * 10; $slvl++; }
-                $conn->query("INSERT INTO user_skills (user_id,skill_id,level,exp) VALUES ($user_id,'$sid',$slvl,$sexp) ON DUPLICATE KEY UPDATE level=$slvl,exp=$sexp");
+                $ins = $conn->prepare("INSERT INTO user_skills (user_id,skill_id,level,exp) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE level=VALUES(level),exp=VALUES(exp)");
+                $ins->bind_param('isis', $user_id, $sid, $slvl, $sexp);
+                $ins->execute();
+                $ins->close();
                 $skill_updates[$sid] = ['level' => $slvl, 'exp' => $sexp];
             }
 
@@ -142,7 +154,8 @@ try {
             $status = 'fail';
     }
 } catch (Exception $e) {
-    $result = ['success' => false, 'message' => '伺服器錯誤：' . $e->getMessage()];
+    error_log('combat.php exception: ' . $e->getMessage());
+    $result = ['success' => false, 'message' => '伺服器發生錯誤，請稍後再試'];
     $status = 'fail';
 }
 

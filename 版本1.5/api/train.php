@@ -18,6 +18,13 @@ if (!$user_id) {
 }
 
 $action = trim($_REQUEST['action'] ?? '');
+
+// 寫入操作需驗證 CSRF（cooldown_check 為唯讀，跳過）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'cooldown_check' && !csrf_verify()) {
+    echo json_encode(['success' => false, 'message' => '安全驗證失敗', 'code' => 403]);
+    exit;
+}
+
 $result = [];
 $status = 'success';
 
@@ -31,9 +38,8 @@ try {
             $result = [
                 'success'           => true,
                 'is_training'       => $cooldown['is_training'],
-                'can_claim'         => $cooldown['can_claim'],
                 'seconds_remaining' => $cooldown['seconds_remaining'],
-                'cooldown_total'    => TRAIN_COOLDOWN_SEC,
+                'cooldown_total'    => $cooldown['duration_sec'],
                 'stat_points'       => (int)$user['stat_points'],
                 'exp'               => (int)$user['exp'],
                 'level'             => (int)$user['level'],
@@ -82,7 +88,8 @@ try {
             $status = 'fail';
     }
 } catch (Exception $e) {
-    $result = ['success' => false, 'message' => '伺服器錯誤：' . $e->getMessage()];
+    error_log('train.php exception: ' . $e->getMessage());
+    $result = ['success' => false, 'message' => '伺服器發生錯誤，請稍後再試'];
     $status = 'fail';
 }
 

@@ -6,6 +6,7 @@ require_once 'lib/session.php';
 require_once 'lib/functions.php';
 
 if (!isset($_SESSION['player_id'])) { header('Location: login.php'); exit; }
+$_csrf = csrf_token();
 $user_id = (int)$_SESSION['player_id'];
 ensure_pvp_ranking($conn, $user_id);
 
@@ -36,6 +37,7 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>競技場 — 塔城傳說</title>
+<meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;color:#e0e0e0;padding:20px;}
@@ -251,6 +253,7 @@ body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;colo
 </div>
 
 <script>
+const _csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 let cdTimer = null;
 let cd = <?= $cd ?>;
 
@@ -283,7 +286,7 @@ async function doChallenge(defenderId, defenderName) {
 
     const resp = await fetch('api/pvp.php', {
         method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        headers:{'Content-Type':'application/x-www-form-urlencoded', 'X-CSRF-Token': _csrfToken},
         body:`action=challenge&defender_id=${defenderId}`
     });
     const data = await resp.json();

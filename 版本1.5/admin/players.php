@@ -6,6 +6,9 @@ $msg = $msg_type = '';
 
 // ── API 操作 ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_verify()) {
+        die('安全驗證失敗，請重新整理頁面後再試。');
+    }
     $action = $_POST['action'] ?? '';
     $uid    = (int)($_POST['user_id'] ?? 0);
 
@@ -125,6 +128,7 @@ if (isset($_GET['id'])) {
 
           <h4 style="color:#4fc3f7;margin:20px 0 14px;font-size:13px;letter-spacing:1px;">管理操作</h4>
           <form method="POST" onsubmit="return confirmAction(this);" data-action="reset">
+            <?= csrf_field() ?>
             <input type="hidden" name="user_id" value="<?= $detail['id'] ?>">
             <input type="hidden" name="action" value="reset">
             <button type="submit" class="btn btn-warning" style="width:100%;margin-bottom:10px;">
@@ -132,6 +136,7 @@ if (isset($_GET['id'])) {
             </button>
           </form>
           <form method="POST" onsubmit="return confirmAction(this);" data-action="<?= $detail['is_banned'] ? 'unban' : 'ban' ?>">
+            <?= csrf_field() ?>
             <input type="hidden" name="user_id" value="<?= $detail['id'] ?>">
             <input type="hidden" name="action" value="<?= $detail['is_banned'] ? 'unban' : 'ban' ?>">
             <button type="submit" class="btn <?= $detail['is_banned'] ? 'btn-success' : 'btn-danger' ?>" style="width:100%;">
@@ -212,11 +217,13 @@ if (isset($_GET['id'])) {
           <td style="display:flex;gap:6px;">
             <a href="players.php?id=<?=$p['id']?>" class="btn btn-primary">詳情</a>
             <form method="POST" onsubmit="return confirmAction(this);" data-action="reset" style="display:inline;">
+              <?= csrf_field() ?>
               <input type="hidden" name="user_id" value="<?=$p['id']?>">
               <input type="hidden" name="action" value="reset">
               <button type="submit" class="btn btn-warning">重置</button>
             </form>
             <form method="POST" onsubmit="return confirmAction(this);" data-action="<?=$p['is_banned']?'unban':'ban'?>" style="display:inline;">
+              <?= csrf_field() ?>
               <input type="hidden" name="user_id" value="<?=$p['id']?>">
               <input type="hidden" name="action" value="<?=$p['is_banned']?'unban':'ban'?>">
               <button type="submit" class="btn <?=$p['is_banned']?'btn-success':'btn-danger'?>">

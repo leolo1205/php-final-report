@@ -12,7 +12,13 @@ if (!$user_id) {
     exit;
 }
 
+// 寫入操作才驗證 CSRF（GET 狀態查詢不需要）
 $action = trim($_REQUEST['action'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify()) {
+    echo json_encode(['success' => false, 'message' => '安全驗證失敗', 'code' => 403]);
+    exit;
+}
+
 $result = [];
 
 try {
@@ -50,7 +56,8 @@ try {
             $result = ['success' => false, 'message' => '未知的 action'];
     }
 } catch (Exception $e) {
-    $result = ['success' => false, 'message' => '伺服器錯誤：' . $e->getMessage()];
+    error_log('forge.php exception: ' . $e->getMessage());
+    $result = ['success' => false, 'message' => '伺服器發生錯誤，請稍後再試'];
 }
 
 $result['_ms'] = (int)((microtime(true) - $t_start) * 1000);

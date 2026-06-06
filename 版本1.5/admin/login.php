@@ -5,20 +5,36 @@ require_once '../db.php';
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $stmt = $conn->prepare("SELECT id, username, password FROM admin_users WHERE username = ?");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $admin = $stmt->get_result()->fetch_assoc();
-    if ($admin && password_verify($password, $admin['password'])) {
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_id']        = $admin['id'];
-        $_SESSION['admin_user']      = $admin['username'];
-        header('Location: index.php');
-        exit;
+    // 速率限制：5 次失敗鎖定 15 分鐘
+    $rl_key = 'rl_admin_page_' . md5($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!isset($_SESSION[$rl_key])) $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
+    if ($_SESSION[$rl_key]['fails'] > 0 && (time() - $_SESSION[$rl_key]['since']) >= 900) {
+        $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
     }
-    $error = '帳號或密碼錯誤，請重試';
+
+    if ($_SESSION[$rl_key]['fails'] >= 5) {
+        $wait = (int)ceil((900 - (time() - $_SESSION[$rl_key]['since'])) / 60);
+        $error = "嘗試次數過多，請等待 {$wait} 分鐘後再試。";
+    } else {
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $stmt = $conn->prepare("SELECT id, username, password FROM admin_users WHERE username = ?");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $admin = $stmt->get_result()->fetch_assoc();
+        if ($admin && password_verify($password, $admin['password'])) {
+            $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
+            session_regenerate_id(true);
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_id']        = $admin['id'];
+            $_SESSION['admin_user']      = $admin['username'];
+            header('Location: index.php');
+            exit;
+        }
+        $error = '帳號或密碼錯誤，請重試';
+        $_SESSION[$rl_key]['fails']++;
+        if ($_SESSION[$rl_key]['fails'] === 1) $_SESSION[$rl_key]['since'] = time();
+    }
 }
 ?>
 <!DOCTYPE html>

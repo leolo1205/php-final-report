@@ -2,11 +2,17 @@
 session_start();
 date_default_timezone_set('Asia/Taipei');
 require 'db.php';
+require_once 'lib/session.php';
 require_once 'lib/functions.php';
 
 if (!isset($_SESSION['player_id'])) { header('Location: login.php'); exit; }
 $user_id = (int)$_SESSION['player_id'];
 $msg = "";
+
+// --- CSRF 驗證（所有 POST 操作） ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify()) {
+    die('安全驗證失敗，請重新整理頁面後再試。');
+}
 
 // --- 處理屬性配點 ---
 if (isset($_POST['add_stat'])) {
@@ -140,7 +146,7 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
 <div class="container">
     <div class="panel">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin-bottom: 0;">🧑‍🚀 <?php echo $user['username']; ?> <span style="font-size: 14px; color: #aaa;">(Lv. <?php echo $user['level']; ?>)</span></h2>
+            <h2 style="margin-bottom: 0;">🧑‍🚀 <?php echo htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'); ?> <span style="font-size: 14px; color: #aaa;">(Lv. <?php echo $user['level']; ?>)</span></h2>
             <a href="logout.php" style="text-decoration: none;">
                 <button type="button" style="background: transparent; color: #f44336; border: 1px solid #f44336; padding: 5px 12px; font-size: 12px; width: auto; border-radius: 5px; cursor: pointer; white-space: nowrap;" onmouseover="this.style.background='#f44336';this.style.color='#fff';" onmouseout="this.style.background='transparent';this.style.color='#f44336';">登出</button>
             </a>
@@ -165,17 +171,17 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
         </div>
 
         <div class="stats-container">
-            <div class="stat-row"><span class="stat-name">⚔️ 傷害</span><span class="stat-value" style="color: #64b5f6;"><?php echo $user['dmg']; ?></span><?php if($user['stat_points'] > 0): ?><form method="post" style="margin:0;"><button type="submit" name="add_stat" value="dmg" class="btn-add">+3</button></form><?php endif; ?></div>
-            <div class="stat-row"><span class="stat-name">🛡️ 防禦</span><span class="stat-value" style="color: #64b5f6;"><?php echo $user['def']; ?></span><?php if($user['stat_points'] > 0): ?><form method="post" style="margin:0;"><button type="submit" name="add_stat" value="def" class="btn-add">+1</button></form><?php endif; ?></div>
-            <div class="stat-row"><span class="stat-name">❤️ 血量上限</span><span class="stat-value" style="color: #ef5350;"><?php echo $user['max_hp']; ?></span><?php if($user['stat_points'] > 0): ?><form method="post" style="margin:0;"><button type="submit" name="add_stat" value="hp" class="btn-add">+10</button></form><?php endif; ?></div>
+            <div class="stat-row"><span class="stat-name">⚔️ 傷害</span><span class="stat-value" style="color: #64b5f6;"><?php echo $user['dmg']; ?></span><?php if($user['stat_points'] > 0): ?><form method="post" style="margin:0;"><?= csrf_field() ?><button type="submit" name="add_stat" value="dmg" class="btn-add">+3</button></form><?php endif; ?></div>
+            <div class="stat-row"><span class="stat-name">🛡️ 防禦</span><span class="stat-value" style="color: #64b5f6;"><?php echo $user['def']; ?></span><?php if($user['stat_points'] > 0): ?><form method="post" style="margin:0;"><?= csrf_field() ?><button type="submit" name="add_stat" value="def" class="btn-add">+1</button></form><?php endif; ?></div>
+            <div class="stat-row"><span class="stat-name">❤️ 血量上限</span><span class="stat-value" style="color: #ef5350;"><?php echo $user['max_hp']; ?></span><?php if($user['stat_points'] > 0): ?><form method="post" style="margin:0;"><?= csrf_field() ?><button type="submit" name="add_stat" value="hp" class="btn-add">+10</button></form><?php endif; ?></div>
             <!-- 閃避率套用動態數值，拿掉(固定) -->
             <div class="stat-row"><span class="stat-name">🍃 閃避率</span><span class="stat-value" style="color: #81c784;"><?php echo $actual_dodge_rate; ?>%</span></div>
             <div class="stat-row"><span class="stat-name">💥 爆擊率</span><span class="stat-value" style="color: #ff8a65;"><?php echo $actual_crit_rate; ?>%</span></div>
             <div class="stat-row"><span class="stat-name">🔥 爆擊傷害 (固定)</span><span class="stat-value" style="color: #ffb74d;">150%</span></div>
         </div>
         
-        <a href="skills.php" style="text-decoration: none;">
-            <button type="button" style="background-color: #9c27b0; color: white; margin-bottom: 8px;">📖 查看被動技能</button>
+        <a href="skills_build.php" style="text-decoration: none;">
+            <button type="button" style="background-color: #9c27b0; color: white; margin-bottom: 8px;">⚔️ 技能樹</button>
         </a>
         <a href="forge.php" style="text-decoration: none;">
             <button type="button" style="background-color: #b8860b; color: white; margin-bottom: 8px;">⚒️ 裝備鍛造</button>
@@ -197,6 +203,7 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
             $ps = $plan_styles[$key];
           ?>
           <form method="post" style="margin:0;">
+            <?= csrf_field() ?>
             <input type="hidden" name="start_train" value="1">
             <input type="hidden" name="plan" value="<?= $key ?>">
             <button type="submit" style="
@@ -219,6 +226,7 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
         <?php endif; ?>
 
         <form method="post" onsubmit="return confirm('⚠️ 警告：即將重置帳號！\n等級、屬性、金幣、塔層數將全部歸零。\n\n確定要重新開始嗎？');">
+            <?= csrf_field() ?>
             <button type="submit" name="reset_account" class="btn-reset">🚨 重置帳號</button>
         </form>
     </div>
