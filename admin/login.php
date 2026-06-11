@@ -1,32 +1,39 @@
 <?php
-require_once __DIR__ . '/../includes/db.php';
+session_start();
+if (isset($_SESSION['admin_logged_in'])) { header('Location: index.php'); exit; }
+require_once '../db.php';
 
-if (session_status() === PHP_SESSION_NONE) session_start();
-
-// 已登入直接跳轉
-if (!empty($_SESSION['user_id'])) {
-    header('Location: dashboard.php'); exit;
-}
-
-$err = '';
-
+$error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
+    // 速率限制：5 次失敗鎖定 15 分鐘
+    $rl_key = 'rl_admin_page_' . md5($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!isset($_SESSION[$rl_key])) $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
+    if ($_SESSION[$rl_key]['fails'] > 0 && (time() - $_SESSION[$rl_key]['since']) >= 900) {
+        $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
+    }
 
-    if ($username === '' || $password === '') {
-        $err = '請輸入帳號與密碼';
+    if ($_SESSION[$rl_key]['fails'] >= 5) {
+        $wait = (int)ceil((900 - (time() - $_SESSION[$rl_key]['since'])) / 60);
+        $error = "嘗試次數過多，請等待 {$wait} 分鐘後再試。";
     } else {
-        $stmt = db()->prepare("SELECT * FROM users WHERE username = ? AND role = 'admin' LIMIT 1");
-        $stmt->execute([$username]);
-        $user = $stmt->fetch();
-
-        if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['id'];
-            header('Location: dashboard.php'); exit;
-        } else {
-            $err = '帳號或密碼錯誤，或無管理員權限';
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $stmt = $conn->prepare("SELECT id, username, password FROM admin_users WHERE username = ?");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $admin = $stmt->get_result()->fetch_assoc();
+        if ($admin && password_verify($password, $admin['password'])) {
+            $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
+            session_regenerate_id(true);
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_id']        = $admin['id'];
+            $_SESSION['admin_user']      = $admin['username'];
+            header('Location: index.php');
+            exit;
         }
+        $error = '帳號或密碼錯誤，請重試';
+        $_SESSION[$rl_key]['fails']++;
+        if ($_SESSION[$rl_key]['fails'] === 1) $_SESSION[$rl_key]['since'] = time();
     }
 }
 ?>
@@ -35,95 +42,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>後台登入 — 異界塔</title>
-<link rel="stylesheet" href="../assets/style.css">
+<title>後台管理 — 登入</title>
 <style>
-  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
-  .login-box {
-    width: 360px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 36px 32px;
-    box-shadow: 0 4px 20px rgba(0,0,0,.08);
-  }
-  .login-box h1 {
-    font-size: 1.4em;
-    color: var(--primary);
-    text-align: center;
-    margin-bottom: 6px;
-  }
-  .login-box .sub {
-    text-align: center;
-    color: var(--muted);
-    font-size: .85em;
-    margin-bottom: 28px;
-  }
-  .field { margin-bottom: 16px; }
-  .field label { display:block; font-size:.85em; color:var(--muted); margin-bottom:6px; font-weight:600; }
-  .field input {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    font-size: .95em;
-    font-family: var(--font);
-    background: var(--surface2);
-    color: var(--text);
-    transition: border-color .15s;
-  }
-  .field input:focus { outline:none; border-color:var(--primary); }
-  .err {
-    background: rgba(239,68,68,.08);
-    color: var(--red);
-    border: 1px solid rgba(239,68,68,.2);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: .88em;
-    margin-bottom: 16px;
-  }
-  .btn-login {
-    width: 100%;
-    padding: 12px;
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 1em;
-    font-family: var(--font);
-    font-weight: 600;
-    cursor: pointer;
-    transition: filter .15s;
-    margin-top: 4px;
-  }
-  .btn-login:hover { filter: brightness(1.1); }
-  .back { display:block; text-align:center; margin-top:18px; font-size:.85em; color:var(--muted); text-decoration:none; }
-  .back:hover { color:var(--primary); }
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  min-height:100vh;
+  background:radial-gradient(ellipse at center,#0d1b2a 0%,#0d0d1a 70%);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Segoe UI','微軟正黑體',sans-serif;
+  color:#e0e0e0;
+}
+.card{
+  background:#16213e;
+  border:1px solid #2a2a4a;
+  border-radius:14px;
+  padding:48px 44px;
+  width:400px;
+  box-shadow:0 0 60px rgba(79,195,247,.12),0 20px 40px rgba(0,0,0,.5);
+}
+.logo{text-align:center;margin-bottom:36px;}
+.logo .icon{font-size:52px;display:block;margin-bottom:14px;}
+.logo h1{font-size:22px;color:#4fc3f7;letter-spacing:3px;font-weight:700;}
+.logo p{font-size:12px;color:#555;margin-top:6px;letter-spacing:1px;}
+.divider{height:1px;background:linear-gradient(90deg,transparent,#2a2a4a,transparent);margin:0 0 28px;}
+
+.form-group{margin-bottom:22px;}
+.form-group label{
+  display:block;font-size:12px;color:#888;
+  margin-bottom:8px;letter-spacing:1.5px;text-transform:uppercase;
+}
+.form-group input{
+  width:100%;padding:13px 16px;
+  background:#0d0d1a;border:1px solid #2a2a4a;border-radius:8px;
+  color:#e0e0e0;font-size:15px;transition:border-color .2s,box-shadow .2s;
+}
+.form-group input:focus{outline:none;border-color:#4fc3f7;box-shadow:0 0 0 3px rgba(79,195,247,.1);}
+.form-group input::placeholder{color:#444;}
+
+.btn-login{
+  width:100%;padding:14px;
+  background:linear-gradient(135deg,#1565c0 0%,#4fc3f7 100%);
+  border:none;border-radius:8px;color:#fff;
+  font-size:15px;font-weight:700;cursor:pointer;
+  letter-spacing:3px;transition:opacity .2s,transform .1s;
+  margin-top:6px;
+}
+.btn-login:hover{opacity:.92;transform:translateY(-1px);}
+.btn-login:active{transform:translateY(0);}
+
+.error-msg{
+  background:rgba(239,83,80,.12);border:1px solid rgba(239,83,80,.4);
+  color:#ef9a9a;padding:11px 15px;border-radius:7px;
+  font-size:13px;margin-bottom:22px;text-align:center;
+}
+.footer-links{text-align:center;margin-top:24px;}
+.footer-links a{color:#444;font-size:12px;text-decoration:none;transition:color .2s;}
+.footer-links a:hover{color:#4fc3f7;}
 </style>
 </head>
 <body>
-<div class="login-box">
-  <h1>⚔ 後台管理</h1>
-  <p class="sub">異界塔 管理員登入</p>
-
-  <?php if ($err): ?>
-  <div class="err"><?= htmlspecialchars($err) ?></div>
+<div class="card">
+  <div class="logo">
+    <span class="icon">⚔️</span>
+    <h1>後台管理系統</h1>
+    <p>TAR GAME · ADMIN PORTAL</p>
+  </div>
+  <div class="divider"></div>
+  <?php if ($error): ?>
+  <div class="error-msg">⚠ <?= htmlspecialchars($error) ?></div>
   <?php endif; ?>
-
-  <form method="POST">
-    <div class="field">
+  <form method="POST" autocomplete="off">
+    <div class="form-group">
       <label>管理員帳號</label>
-      <input type="text" name="username" placeholder="admin"
-             value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" autofocus>
+      <input type="text" name="username" placeholder="admin" required autofocus>
     </div>
-    <div class="field">
+    <div class="form-group">
       <label>密碼</label>
-      <input type="password" name="password" placeholder="••••••••">
+      <input type="password" name="password" placeholder="••••••••" required>
     </div>
-    <button type="submit" class="btn-login">登入後台</button>
+    <button type="submit" class="btn-login">登　入</button>
   </form>
-
-  <a href="../game.php" class="back">← 返回遊戲</a>
+  <div class="footer-links"><a href="../index.php">← 返回遊戲前台</a></div>
 </div>
 </body>
 </html>
