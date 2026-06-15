@@ -59,8 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>註冊 — 塔城傳說</title>
+<link rel="stylesheet" href="assets/style.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
 body{
   min-height:100vh;background:#0d0d1a;
   display:flex;align-items:center;justify-content:center;

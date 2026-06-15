@@ -1,7 +1,7 @@
 <?php
 require_once 'auth.php';
 require_once '../db.php';
-require_once '../lib/functions.php';
+require_once '../lib/session.php';
 
 // ── DB 連線資訊 ──
 $db_ver   = $conn->query("SELECT VERSION() AS v")->fetch_assoc()['v'];

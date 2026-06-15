@@ -1,7 +1,7 @@
 <?php
 require_once 'auth.php';
 require_once '../db.php';
-require_once '../lib/functions.php';
+require_once '../lib/pvp.php';
 
 $msg = '';
 if (isset($_POST['weekly_settle'])) {

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'db.php';
+require_once 'lib/session.php';
 
 if (!isset($_SESSION['player_id'])) { header('Location: login.php'); exit; }
 $user_id = (int)$_SESSION['player_id'];
@@ -32,8 +33,9 @@ $dodge_percent = min(100, ($dodge_exp / $dodge_req) * 100);
 <head>
     <title>被動技能</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="assets/style.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #e0e0e0; display: flex; justify-content: center; padding: 20px; margin: 0;}
+        body { background-color: #1e1e24; display: flex; justify-content: center; padding: 20px; }
         .container { max-width: 600px; width: 100%; background: #2b2b36; padding: 20px; border-radius: 10px; box-shadow: 0 6px 12px rgba(0,0,0,0.3); border: 1px solid #3f3f4e;}
         h2 { margin-top: 0; color: #9c27b0; border-bottom: 2px solid #9c27b0; padding-bottom: 10px; }
         

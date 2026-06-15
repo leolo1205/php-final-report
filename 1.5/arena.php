@@ -38,13 +38,11 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>競技場 — 塔城傳說</title>
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="assets/style.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;color:#e0e0e0;padding:20px;}
-.topbar{display:flex;justify-content:space-between;align-items:center;max-width:1000px;margin:0 auto 20px;flex-wrap:wrap;gap:10px;}
-.topbar h1{font-size:22px;color:#ef5350;letter-spacing:2px;}
-.topbar a{color:#94a3b8;font-size:13px;text-decoration:none;padding:6px 14px;border:1px solid #2a2a4a;border-radius:6px;}
-.topbar a:hover{border-color:#4fc3f7;color:#4fc3f7;}
+body{padding:20px;}
+.topbar{max-width:1000px;}
+.topbar h1{color:#ef5350;}
 .grid{display:grid;grid-template-columns:320px 1fr;gap:20px;max-width:1000px;margin:0 auto;}
 .card{background:#16213e;border:1px solid #2a2a4a;border-radius:12px;overflow:hidden;margin-bottom:20px;}
 .card-header{padding:14px 20px;border-bottom:1px solid #2a2a4a;display:flex;justify-content:space-between;align-items:center;}

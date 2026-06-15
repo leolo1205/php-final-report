@@ -241,8 +241,9 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
 <head>
     <title>探索第 <?php echo $target_floor; ?> 層</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="assets/style.css">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background-color: #1e1e24; color: #e0e0e0; margin: 0; }
+        body { padding: 20px; background-color: #1e1e24; }
         .tower-container { max-width: 700px; margin: 0 auto; padding-bottom: 80px; }
         .node-box { background: #2b2b36; border: 1px solid #3f3f4e; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         .node-title { margin-top: 0; color: #9e9e9e; border-bottom: 1px solid #3f3f4e; padding-bottom: 8px;}

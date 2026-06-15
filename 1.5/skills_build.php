@@ -30,10 +30,10 @@ $arch_info = [
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
 <title>技能樹 — 塔城傳說</title>
+<link rel="stylesheet" href="assets/style.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;color:#e0e0e0;padding:20px;}
-.topbar{display:flex;justify-content:space-between;align-items:center;max-width:920px;margin:0 auto 20px;flex-wrap:wrap;gap:10px;}
+body{padding:20px;}
+.topbar{max-width:920px;}
 .topbar h1{font-size:22px;color:#ffca28;letter-spacing:2px;}
 .topbar-right{display:flex;gap:10px;align-items:center;}
 .gold{font-size:15px;color:#ffca28;font-weight:bold;}

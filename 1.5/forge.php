@@ -25,14 +25,11 @@ $equip_info = [
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>鍛造 — 塔城傳說</title>
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="assets/style.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;color:#e0e0e0;padding:20px;}
-.topbar{display:flex;justify-content:space-between;align-items:center;max-width:860px;margin:0 auto 20px;flex-wrap:wrap;gap:10px;}
-.topbar h1{font-size:22px;color:#ffca28;letter-spacing:2px;}
+body{padding:20px;}
+.topbar h1{color:#ffca28;}
 .topbar .gold{font-size:15px;color:#ffca28;font-weight:bold;}
-.topbar a{color:#94a3b8;font-size:13px;text-decoration:none;padding:6px 14px;border:1px solid #2a2a4a;border-radius:6px;}
-.topbar a:hover{border-color:#4fc3f7;color:#4fc3f7;}
 
 .tabs{display:flex;gap:8px;max-width:860px;margin:0 auto 20px;}
 .tab{padding:11px 28px;border-radius:8px;border:1px solid #2a2a4a;background:#16213e;

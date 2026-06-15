@@ -8,7 +8,8 @@ $t_start = microtime(true);
 
 require_once '../db.php';
 require_once '../lib/session.php';
-require_once '../lib/functions.php';
+require_once '../lib/skill_tree.php';
+require_once '../lib/equipment.php';
 
 $user_id = get_player_id();
 if (!$user_id) {

@@ -3,7 +3,7 @@ header('Content-Type: application/json; charset=utf-8');
 $t_start = microtime(true);
 require_once '../db.php';
 require_once '../lib/session.php';
-require_once '../lib/functions.php';
+require_once '../lib/pvp.php';
 
 $user_id = get_player_id();
 if (!$user_id) { echo json_encode(['success'=>false,'message'=>'未登入']); exit; }

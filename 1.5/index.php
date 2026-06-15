@@ -94,8 +94,9 @@ $exp_percent = min(100, ($user['exp'] / $exp_needed) * 100);
 <head>
     <title>玄墨的城鎮</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="assets/style.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #e0e0e0; padding: 20px; margin: 0; }
+        body { background-color: #1e1e24; padding: 20px; }
         .container { display: flex; gap: 15px; flex-wrap: wrap; max-width: 850px; width: 100%; margin: 0 auto; justify-content: center; }
         .panel { background: #2b2b36; padding: 15px; border-radius: 10px; box-shadow: 0 6px 12px rgba(0,0,0,0.3); flex: 1; min-width: 280px; border: 1px solid #3f3f4e; display: flex; flex-direction: column;}
         h2 { margin-top: 0; margin-bottom: 10px; font-size: 20px; color: #ffffff; border-bottom: 2px solid #4caf50; padding-bottom: 8px; }

@@ -99,8 +99,8 @@ $active = (isset($_POST['type']) && $_POST['type'] === 'admin') ? 'admin' : 'pla
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>登入 — 塔城傳說</title>
+<link rel="stylesheet" href="assets/style.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
 body{
   min-height:100vh;
   background:#0d0d1a;
