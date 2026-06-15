@@ -1,0 +1,169 @@
+targame 專案使用指南
+====================
+
+一、專案位置
+------------
+
+專案位於 XAMPP 的 htdocs/targame：
+
+htdocs/
+└─ targame/
+   ├─ admin/
+   ├─ api/
+   ├─ lib/
+   ├─ index.php
+   ├─ login.php
+   ├─ register.php
+   ├─ tower.php
+   ├─ tower_combat.php
+   ├─ tower_events.php
+   ├─ forge.php
+   ├─ arena.php
+   └─ ...
+
+本機常用網址：
+
+http://localhost/targame/
+http://localhost/targame/login.php
+http://localhost/targame/register.php
+http://localhost/targame/index.php
+http://localhost/targame/admin/login.php
+
+
+二、資料庫設定
+--------------
+
+資料庫名稱：targame
+
+db.php 使用 mysqli 連線，設定如下：
+
+host   = localhost
+user   = root
+pass   = 空密碼
+dbname = targame
+
+db.php 會設定 utf8mb4，以支援 emoji 與完整 Unicode [4]。
+
+正式環境中，db.php 有關閉 display_errors 並開啟 log_errors 的保底設定 [4]。
+
+db.php 也會自動偵測 BASE_URL，供 session 重導向使用 [4]。
+
+
+三、.gitignore 與 .htaccess
+---------------------------
+
+.gitignore 目前排除：
+
+*.sql
+.DS_Store
+Thumbs.db
+config.local.php
+
+其中 *.sql 被標示為資料庫備份，含敏感資料，不上傳 [1]。
+
+.htaccess 目前有禁止目錄瀏覽：
+
+Options -Indexes [2]
+
+HTTPS 強制導向目前仍是註解狀態：
+
+# RewriteEngine On
+# RewriteCond %{HTTPS} off [2]
+
+正式部署時建議啟用 HTTPS 與 secure cookie。
+
+
+四、前台主要檔案
+----------------
+
+targame/index.php
+主城鎮頁面。顯示玩家名稱、等級、EXP、金幣、屬性、訓練方案、爬塔入口等。
+目前主城鎮屬性區使用 .stats-container、.stat-row、.stat-name、.stat-value 等樣式 [5]。
+
+targame/login.php
+玩家登入頁。包含表單、輸入框、背景裝飾等樣式 [6]。
+
+targame/register.php
+玩家註冊頁。包含帳號密碼輸入、規則說明、錯誤訊息等 UI [17]。
+
+targame/logout.php
+玩家登出，會 session_destroy() 後導回 login.php [7]。
+
+targame/forge.php
+裝備鍛造前台畫面。
+
+targame/arena.php
+玩家競技場前台畫面。包含排行榜、對戰紀錄 modal、戰鬥 log 顯示等樣式 [3]。
+
+targame/skills.php
+舊式被動技能頁，有返回城鎮按鈕 [9]。
+
+targame/skills_build.php
+新式技能樹頁，包含流派卡片、節點卡片、toast 提示等 UI [10]。
+
+
+五、爬塔相關檔案
+----------------
+
+targame/tower.php
+爬塔主流程。負責初始化樓層、探索流程、事件節點、結算畫面與返回按鈕。
+結算時會組裝成功或失敗訊息，顯示獲得金幣、EXP、技能熟練度等 [11]。
+
+targame/tower_combat.php
+塔內戰鬥邏輯。會讀取玩家技能 build、初始化技能戰鬥狀態，並依事件判斷是否是 boss [12]。
+實際傷害文字會顯示攻擊者造成多少傷害，並顯示被抵抗的防禦值 [12]。
+
+targame/tower_events.php
+塔內非戰鬥事件，例如商人、購買經驗等。商人與買 EXP 事件會產生表單並帶入 csrf_field() [13]。
+
+targame/tower_monsters.php
+塔怪物與 BOSS 資料。每 5 層會有特殊 boss，目前包含「爆走的尖牙野豬王」，有 hp_mult、dmg_mult、def_mult 等倍率 [14]。
+
+targame/tower_story.php
+塔樓層劇情文字。依 floor 與 node 回傳劇情段落 [15]。
+
+
+六、API 檔案
+------------
+
+api/combat.php
+戰鬥 API。回傳 JSON，支援 normal_attack、defense_stance、try_escape、victory_settle、defeat_settle 等 action [28]。
+會載入 ../db.php、../lib/session.php、../lib/functions.php，並使用 get_player_id() 驗證登入 [28]。
+
+api/forge.php
+鍛造 API。回傳 JSON。會載入 ../db.php、../lib/session.php、../lib/functions.php [29]。
+舊版狀態中仍可看到 bonus = level * equip_bonus_per_level，以及 maxed = level >= 10 的舊邏輯，需要確認是否已更新為 +50 與倍率制 [29]。
+
+api/pvp.php
+PVP API。會載入 ../db.php、../lib/session.php、../lib/functions.php，並檢查 get_player_id() [30]。
+challenge action 會呼叫 do_pvp_challenge() [30]。
+
+api/skill_build.php
+技能樹 API。會回傳 archetype、nodes_unlocked、stat_bonus、gold、next_cost 等資料 [31]。
+
+api/train.php
+訓練 API。支援 add_stat，配點可增加 dmg、hp、def [32]。
+訓練開始時會呼叫 process_levelup() 更新升級資訊 [32]。
+
+api/skills.php
+舊技能 API。會呼叫 choose_archetype()、unlock_node()，並寫入 log_api() [9]。
+如果主線已使用 api/skill_build.php，這支需要確認是否仍被前端呼叫。
+
+
+七、後台檔案
+------------
+
+admin/login.php
+後台登入頁。
+
+admin/logout.php
+後台登出頁。
+
+admin/auth.php
+後台權限檢查。若沒有 admin_logged_in，會導回 admin/login.php，並載入 ../lib/session.php [24]。
+
+admin/_sidebar.php
+後台共用側邊欄。定義 main、topbar、table、modal、tab、logout 等共用樣式 [22]。
+
+admin/index.php
+後台系統
