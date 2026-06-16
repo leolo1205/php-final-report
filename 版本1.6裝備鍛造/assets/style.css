@@ -85,6 +85,12 @@ body {
   background: rgba(79,195,247,.07);
   border-left-color: var(--accent-blue);
 }
+.sidebar-link:focus {
+  color: var(--text-primary);
+  background: rgba(79,195,247,.07);
+  border-left-color: var(--accent-blue);
+  outline: none;
+}
 .sidebar-link.active {
   color: var(--accent-blue);
   background: rgba(79,195,247,.12);
@@ -165,6 +171,7 @@ body {
 }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-primary:active { transform: scale(.98); }
+.btn-primary:focus { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .btn-primary:disabled { background: #374151; color: #6b7280; cursor: not-allowed; filter: none; }
 
 .btn-outline {
@@ -180,6 +187,7 @@ body {
   display: inline-block;
 }
 .btn-outline:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.btn-outline:focus { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 
 .btn-danger {
   background: transparent;
@@ -192,6 +200,7 @@ body {
   transition: all .2s;
 }
 .btn-danger:hover { background: var(--accent-red); color: #fff; }
+.btn-danger:focus { outline: 2px solid var(--accent-red); outline-offset: 2px; }
 
 /* ── 進度條 ── */
 .bar-track {
