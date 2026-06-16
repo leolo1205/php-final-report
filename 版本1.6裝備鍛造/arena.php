@@ -38,74 +38,62 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>競技場 — 塔城傳說</title>
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="assets/style.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI','微軟正黑體',sans-serif;background:#0d0d1a;color:#e0e0e0;padding:20px;}
-.topbar{display:flex;justify-content:space-between;align-items:center;max-width:1000px;margin:0 auto 20px;flex-wrap:wrap;gap:10px;}
-.topbar h1{font-size:22px;color:#ef5350;letter-spacing:2px;}
-.topbar a{color:#94a3b8;font-size:13px;text-decoration:none;padding:6px 14px;border:1px solid #2a2a4a;border-radius:6px;}
-.topbar a:hover{border-color:#4fc3f7;color:#4fc3f7;}
-.grid{display:grid;grid-template-columns:320px 1fr;gap:20px;max-width:1000px;margin:0 auto;}
-.card{background:#16213e;border:1px solid #2a2a4a;border-radius:12px;overflow:hidden;margin-bottom:20px;}
-.card-header{padding:14px 20px;border-bottom:1px solid #2a2a4a;display:flex;justify-content:space-between;align-items:center;}
-.card-header h3{font-size:14px;font-weight:700;color:#e0e0e0;}
-.card-body{padding:20px;}
-
-/* 我的戰績 */
-.rating-big{font-size:52px;font-weight:700;color:#ef5350;line-height:1;text-align:center;margin:8px 0;}
-.rating-rank{text-align:center;font-size:13px;color:#94a3b8;margin-bottom:16px;}
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;}
-.stat-box{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:8px;padding:10px;text-align:center;}
-.stat-box .sv{font-size:20px;font-weight:700;}
-.stat-box .sl{font-size:10px;color:#555;margin-top:3px;}
-.cd-bar{background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;padding:10px 14px;text-align:center;font-size:13px;color:#ffca28;margin-bottom:12px;display:none;}
-
-/* 排行榜 */
-.rank-table{width:100%;border-collapse:collapse;font-size:13px;}
-.rank-table th{padding:10px 14px;text-align:left;font-size:11px;color:#555;border-bottom:1px solid #1a1a2e;background:#0d0d1a;}
-.rank-table td{padding:11px 14px;border-bottom:1px solid #1a1a2e;color:#ccc;}
-.rank-table tr:last-child td{border-bottom:none;}
-.rank-table tr:hover td{background:rgba(79,195,247,.03);}
-.rank-num{font-weight:700;width:36px;}
+/* arena 頁面專屬 */
+.arena-wrap { max-width:1000px; margin:0 auto; }
+.page-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+.page-topbar h1 { font-size:22px; color:var(--accent-red); letter-spacing:2px; }
+.grid { display:grid; grid-template-columns:320px 1fr; gap:20px; }
+.rating-big { font-size:52px; font-weight:700; color:var(--accent-red); line-height:1; text-align:center; margin:8px 0; }
+.rating-rank { text-align:center; font-size:13px; color:var(--text-muted); margin-bottom:16px; }
+.stats-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px; }
+.stat-box { background:var(--bg-base); border:1px solid #1a1a2e; border-radius:8px; padding:10px; text-align:center; }
+.stat-box .sv { font-size:20px; font-weight:700; }
+.stat-box .sl { font-size:10px; color:#555; margin-top:3px; }
+.cd-bar { background:var(--bg-base); border:1px solid var(--border); border-radius:7px; padding:10px 14px; text-align:center; font-size:13px; color:var(--accent); margin-bottom:12px; display:none; }
+.rank-table { width:100%; border-collapse:collapse; font-size:13px; }
+.rank-table th { padding:10px 14px; text-align:left; font-size:11px; color:#555; border-bottom:1px solid #1a1a2e; background:var(--bg-base); }
+.rank-table td { padding:11px 14px; border-bottom:1px solid #1a1a2e; color:#ccc; }
+.rank-table tr:last-child td { border-bottom:none; }
+.rank-table tr:hover td { background:rgba(79,195,247,.03); }
+.rank-num { font-weight:700; width:36px; }
 .rank-1{color:#ffd700;} .rank-2{color:#c0c0c0;} .rank-3{color:#cd7f32;}
-
-/* 對手列表 */
-.opp-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #1a1a2e;}
-.opp-row:last-child{border-bottom:none;}
-.opp-info{flex:1;}
-.opp-name{font-size:14px;font-weight:600;color:#e0e0e0;}
-.opp-meta{font-size:11px;color:#555;margin-top:3px;}
-.opp-rating{font-size:16px;font-weight:700;color:#ef5350;margin:0 16px;}
-.btn-challenge{padding:7px 16px;background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.4);color:#ef5350;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;}
-.btn-challenge:hover{background:rgba(239,83,80,.2);}
-.btn-challenge:disabled{opacity:.4;cursor:not-allowed;}
-
-/* 戰鬥 Modal */
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;}
-.modal-bg.show{display:flex;}
-.modal{background:#16213e;border:1px solid #2a2a4a;border-radius:14px;width:520px;max-width:95vw;max-height:85vh;overflow-y:auto;}
-.modal-head{padding:20px 24px;border-bottom:1px solid #2a2a4a;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#16213e;z-index:1;}
-.modal-head h3{font-size:16px;color:#e0e0e0;}
-.modal-close{background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:4px 8px;}
-.modal-close:hover{color:#e0e0e0;}
-.modal-body{padding:20px 24px;}
-.log-line{padding:7px 12px;border-radius:6px;font-size:13px;margin-bottom:6px;line-height:1.5;}
-.log-system{background:#1a1a2e;color:#94a3b8;}
-.log-attack{background:#1a0d0d;color:#ef9a9a;}
-.log-crit{background:#2a1000;color:#ffca28;font-weight:700;}
-.log-dodge{background:#0d1a0d;color:#66bb6a;}
-.log-result{background:rgba(239,83,80,.12);border:1px solid rgba(239,83,80,.3);color:#ef5350;font-weight:700;font-size:14px;text-align:center;padding:14px;}
-.result-banner{text-align:center;padding:20px 0;margin-bottom:16px;}
-.result-banner .big{font-size:28px;font-weight:700;}
-.result-banner .sub{font-size:13px;color:#94a3b8;margin-top:6px;}
-
-/* 週獎勵提示 */
-.weekly-hint{background:#1a1000;border:1px solid #3a2800;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#ffca28;}
+.opp-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #1a1a2e; }
+.opp-row:last-child { border-bottom:none; }
+.opp-info { flex:1; }
+.opp-name { font-size:14px; font-weight:600; color:var(--text-primary); }
+.opp-meta { font-size:11px; color:#555; margin-top:3px; }
+.opp-rating { font-size:16px; font-weight:700; color:var(--accent-red); margin:0 16px; }
+.btn-challenge { padding:7px 16px; background:rgba(239,83,80,.1); border:1px solid rgba(239,83,80,.4); color:var(--accent-red); border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; transition:all .2s; }
+.btn-challenge:hover { background:rgba(239,83,80,.2); }
+.btn-challenge:disabled { opacity:.4; cursor:not-allowed; }
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:999; align-items:center; justify-content:center; }
+.modal-bg.show { display:flex; }
+.modal { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; width:520px; max-width:95vw; max-height:85vh; overflow-y:auto; }
+.modal-head { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--bg-card); z-index:1; }
+.modal-head h3 { font-size:16px; color:var(--text-primary); }
+.modal-close { background:none; border:none; color:#555; font-size:20px; cursor:pointer; padding:4px 8px; }
+.modal-close:hover { color:var(--text-primary); }
+.modal-body { padding:20px 24px; }
+.log-line { padding:7px 12px; border-radius:6px; font-size:13px; margin-bottom:6px; line-height:1.5; }
+.log-system { background:#1a1a2e; color:var(--text-muted); }
+.log-attack { background:#1a0d0d; color:#ef9a9a; }
+.log-crit   { background:#2a1000; color:var(--accent); font-weight:700; }
+.log-dodge  { background:#0d1a0d; color:var(--accent-green); }
+.log-result { background:rgba(239,83,80,.12); border:1px solid rgba(239,83,80,.3); color:var(--accent-red); font-weight:700; font-size:14px; text-align:center; padding:14px; }
+.result-banner { text-align:center; padding:20px 0; margin-bottom:16px; }
+.result-banner .big { font-size:28px; font-weight:700; }
+.result-banner .sub { font-size:13px; color:var(--text-muted); margin-top:6px; }
+.weekly-hint { background:#1a1000; border:1px solid #3a2800; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:12px; color:var(--accent); }
 </style>
 </head>
 <body>
+<?php require '_sidebar.php'; ?>
+<div class="page-body">
+<div class="arena-wrap">
 
-<div class="topbar">
+<div class="page-topbar">
   <h1>🏟️ 競技場</h1>
   <div style="display:flex;gap:10px;align-items:center;">
     <span style="font-size:13px;color:#94a3b8;">每週一 0:00 結算金幣獎勵</span>
@@ -373,5 +361,7 @@ document.getElementById('battle-modal').addEventListener('click', function(e) {
 
 if (cd > 0) startCd(cd);
 </script>
+</div><!-- /arena-wrap -->
+</div><!-- /page-body -->
 </body>
 </html>
