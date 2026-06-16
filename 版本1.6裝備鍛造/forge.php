@@ -16,44 +16,6 @@ $_csrf = csrf_token();
 $user = $conn->query("SELECT username, gold FROM users WHERE id=$user_id")->fetch_assoc();
 $eq = get_equipment($conn, $user_id);
 
-if (!function_exists('forge_max_level')) {
-    function forge_max_level() {
-        return 50;
-    }
-}
-
-if (!function_exists('forge_upgrade_cost')) {
-    function forge_upgrade_cost($current_level) {
-        $current_level = max(0, (int)$current_level);
-        $next_level = $current_level + 1;
-
-        return (int)(100 * $next_level * ($next_level + 1) / 2);
-    }
-}
-
-if (!function_exists('forge_upgrade_chance')) {
-    function forge_upgrade_chance($current_level) {
-        $current_level = max(0, (int)$current_level);
-        $next_level = $current_level + 1;
-
-        if ($next_level > forge_max_level()) {
-            return 0;
-        }
-
-        $block = intdiv($next_level - 1, 10);
-        $step = ($next_level - 1) % 10;
-        $chance = 100 - ($block * 10) - ($step * 2);
-
-        return max(1, min(100, $chance));
-    }
-}
-
-if (!function_exists('equipment_multiplier')) {
-    function equipment_multiplier($level) {
-        $level = max(0, min(forge_max_level(), (int)$level));
-        return pow(1.01, $level);
-    }
-}
 
 $equip_info = [
     'weapon' => [

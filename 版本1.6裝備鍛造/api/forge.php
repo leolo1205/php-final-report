@@ -19,48 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify()) {
     exit;
 }
 
-/*
- * 這幾個 fallback 是避免 lib/functions.php 尚未更新時，
- * get_status 頁面直接噴錯；真正強化邏輯仍以 functions.php 的 upgrade_equipment() 為準。
- */
-if (!function_exists('forge_max_level')) {
-    function forge_max_level() {
-        return 50;
-    }
-}
-
-if (!function_exists('forge_upgrade_cost')) {
-    function forge_upgrade_cost($current_level) {
-        $current_level = max(0, (int)$current_level);
-        $next_level = $current_level + 1;
-
-        return (int)(100 * $next_level * ($next_level + 1) / 2);
-    }
-}
-
-if (!function_exists('forge_upgrade_chance')) {
-    function forge_upgrade_chance($current_level) {
-        $current_level = max(0, (int)$current_level);
-        $next_level = $current_level + 1;
-
-        if ($next_level > forge_max_level()) {
-            return 0;
-        }
-
-        $block = intdiv($next_level - 1, 10);
-        $step = ($next_level - 1) % 10;
-        $chance = 100 - ($block * 10) - ($step * 2);
-
-        return max(1, min(100, $chance));
-    }
-}
-
-if (!function_exists('equipment_multiplier')) {
-    function equipment_multiplier($level) {
-        $level = max(0, min(forge_max_level(), (int)$level));
-        return pow(1.01, $level);
-    }
-}
 
 $status = 'success';
 $result = ['success' => false, 'message' => '未知的 action'];
@@ -155,20 +113,9 @@ try {
     $status = 'fail';
 }
 
-$result['_status'] = $status;
-$result['_ms'] = (int)((microtime(true) - $t_start) * 1000);
-
+$ms = (int)((microtime(true) - $t_start) * 1000);
 if (function_exists('log_api')) {
-    log_api(
-        $conn,
-        'forge',
-        $action,
-        $user_id,
-        $status,
-        $result['_ms'],
-        $_REQUEST,
-        $result
-    );
+    log_api($conn, 'forge', $action, $user_id, $status, $ms, $_REQUEST, $result);
 }
 
 echo json_encode($result, JSON_UNESCAPED_UNICODE);

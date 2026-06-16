@@ -17,21 +17,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify()) {
 // --- 處理屬性配點 ---
 if (isset($_POST['add_stat'])) {
     $stat_type = $_POST['add_stat'];
-    $sql_check = "SELECT stat_points FROM users WHERE id = $user_id";
-    $user_check = $conn->query($sql_check)->fetch_assoc();
-    if ($user_check['stat_points'] > 0) {
-        $update_sql = "";
-        if ($stat_type === 'dmg') {
-            $update_sql = "UPDATE users SET dmg = dmg + 3, stat_points = stat_points - 1 WHERE id = $user_id";
-            $msg .= "<span style='color:#4caf50;'>分配完成：傷害 +3</span><br>";
-        } elseif ($stat_type === 'hp') {
-            $update_sql = "UPDATE users SET max_hp = max_hp + 10, hp = hp + 10, stat_points = stat_points - 1 WHERE id = $user_id";
-            $msg .= "<span style='color:#4caf50;'>分配完成：血量上限 +10</span><br>";
-        } elseif ($stat_type === 'def') {
-            $update_sql = "UPDATE users SET def = def + 1, stat_points = stat_points - 1 WHERE id = $user_id";
-            $msg .= "<span style='color:#4caf50;'>分配完成：防禦 +1</span><br>";
-        }
-        if ($update_sql) $conn->query($update_sql);
+    $stat_map = [
+        'dmg' => ['SET dmg=dmg+3',                    '傷害 +3'],
+        'hp'  => ['SET max_hp=max_hp+10,hp=hp+10',    '血量上限 +10'],
+        'def' => ['SET def=def+1',                     '防禦 +1'],
+    ];
+    $user_check = $conn->query("SELECT stat_points FROM users WHERE id=$user_id")->fetch_assoc();
+    if ($user_check['stat_points'] > 0 && isset($stat_map[$stat_type])) {
+        [$set_clause, $label] = $stat_map[$stat_type];
+        $conn->query("UPDATE users $set_clause,stat_points=stat_points-1 WHERE id=$user_id");
+        $msg .= "<span style='color:#4caf50;'>分配完成：$label</span><br>";
     }
 }
 

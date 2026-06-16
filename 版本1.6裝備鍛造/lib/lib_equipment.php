@@ -47,28 +47,6 @@ function forge_upgrade_chance($current_level) {
     return max(1, min(100, $chance));
 }
 
-/**
- * 舊版相容：回傳強化表
- */
-function get_upgrade_table() {
-    $table = [];
-
-    for ($level = 0; $level < forge_max_level(); $level++) {
-        $table[$level] = [
-            'cost' => forge_upgrade_cost($level),
-            'chance' => forge_upgrade_chance($level),
-        ];
-    }
-
-    return $table;
-}
-
-/**
- * 舊版相容：不再使用固定加成
- */
-function equip_bonus_per_level($type) {
-    return 0;
-}
 
 /**
  * 裝備倍率
@@ -93,14 +71,13 @@ function get_equipment($conn, $user_id) {
     $result = [];
 
     foreach ($types as $type) {
-        $safe_type = $conn->real_escape_string($type);
-        $q = $conn->query("SELECT * FROM user_equipment WHERE user_id=$user_id AND equip_type='$safe_type'");
+        $q = $conn->query("SELECT * FROM user_equipment WHERE user_id=$user_id AND equip_type='$type'");
         $row = ($q !== false) ? $q->fetch_assoc() : null;
 
         if (!$row) {
             if ($q !== false) {
                 $conn->query("INSERT INTO user_equipment (user_id, equip_type, level, attempts, successes)
-                    VALUES ($user_id, '$safe_type', 0, 0, 0)");
+                    VALUES ($user_id, '$type', 0, 0, 0)");
             }
 
             $row = [
@@ -232,31 +209,6 @@ function get_player_effective_stats($conn, $user_id) {
     ];
 }
 
-/**
- * 屬性顯示格式：真實值(原數值)
- *
- * 例：
- * 380(235)
- */
-function format_effective_stat($stat) {
-    $value = (int)($stat['value'] ?? 0);
-    $raw = (int)($stat['raw'] ?? 0);
-
-    return $value . '(' . $raw . ')';
-}
-
-/**
- * 屬性詳細說明文字
- */
-function effective_stat_title($label, $stat) {
-    $raw = (int)($stat['raw'] ?? 0);
-    $flat = (int)($stat['flat'] ?? 0);
-    $mult = (float)($stat['mult'] ?? 1);
-    $value = (int)($stat['value'] ?? 0);
-    $equip_level = (int)($stat['equip_level'] ?? 0);
-
-    return "{$label}：原始 {$raw} + 固定加成 {$flat}，裝備 +{$equip_level} 倍率 " . number_format($mult, 2) . "x = {$value}";
-}
 
 /**
  * 嘗試強化裝備
@@ -311,13 +263,12 @@ function upgrade_equipment($conn, $user_id, $type) {
     $rolled = rand(1, 100);
     $leveled = ($rolled <= $chance);
     $new_level = $leveled ? $level + 1 : $level;
-    $safe_type = $conn->real_escape_string($type);
 
     $conn->query("UPDATE user_equipment SET
         level=$new_level,
         attempts=attempts+1,
         successes=successes+".($leveled ? 1 : 0)."
-        WHERE user_id=$user_id AND equip_type='$safe_type'");
+        WHERE user_id=$user_id AND equip_type='$type'");
 
     $names = [
         'weapon' => '武器',

@@ -98,6 +98,38 @@ function get_pvp_fighter($conn, $user_id) {
     ];
 }
 
+function _pvp_do_attack(array &$atk, array &$def, array &$ss_atk, array &$ss_def, int &$corr_on_def, array &$log): void {
+    $crit_r = $atk['crit_rate'];
+    if ($ss_atk['vengeance_ready']) { $crit_r = 100; $ss_atk['vengeance_ready'] = false; }
+
+    $eff_def = skill_get_effective_def($def['build'], $def['hp'], $def['max_hp'], max(0, $def['def'] - $corr_on_def));
+    $hunt    = skill_hunting_bonus($atk['build'], $def['hp'], $def['max_hp']);
+    $hit     = calculate_damage((int)($atk['atk'] * (1 + $hunt)), $eff_def, $crit_r, $def['dodge_rate']);
+
+    if ($hit['dodged']) {
+        $log[] = ['type' => 'dodge', 'text' => "💨 {$def['username']} 閃避了 {$atk['username']} 的攻擊！"];
+        return;
+    }
+
+    $def['hp'] -= $hit['damage'];
+    $prefix = $hit['crit'] ? "💥 爆擊！" : "";
+    $log[] = ['type' => ($hit['crit'] ? 'crit' : 'attack'),
+              'text' => "{$prefix}{$atk['username']} 造成 {$hit['damage']} 傷害。{$def['username']} 剩餘 HP：" . max(0, $def['hp'])];
+
+    $sa = skill_on_player_attack($atk['build'], $ss_atk, $hit, $def['hp'], $def['max_hp'], $corr_on_def);
+    if ($sa['extra'] > 0) { $def['hp'] -= $sa['extra']; $log[] = ['type' => 'system', 'text' => "{$atk['username']} {$sa['log']}"]; }
+
+    $take_r = skill_on_player_take_dmg($def['build'], $ss_def, $hit, $hit['damage']);
+    if ($take_r['log']) { $log[] = ['type' => 'system', 'text' => "{$def['username']} {$take_r['log']}"]; }
+}
+
+function _pvp_undying_check(array &$fighter, array &$ss, array &$log): void {
+    if ($fighter['hp'] <= 0) {
+        $ud = skill_check_undying($fighter['build'], $ss, $fighter['max_hp']);
+        if ($ud['revived']) { $fighter['hp'] = $ud['new_hp']; $log[] = ['type' => 'system', 'text' => $ud['log']]; }
+    }
+}
+
 /**
  * 模擬 PVP 戰鬥（含技能樹效果）
  */
@@ -134,128 +166,29 @@ function simulate_pvp_battle($conn, $challenger_id, $defender_id) {
     while ($a['hp'] > 0 && $b['hp'] > 0 && $round < 200) {
         $round++;
 
-        foreach (['a', 'b'] as $side) {
-            if ($side === 'a') {
-                $rs = skill_round_start($a['build'], $ss_a, $a['hp'], $a['max_hp']);
+        $rs = skill_round_start($a['build'], $ss_a, $a['hp'], $a['max_hp']);
+        if ($rs['heal'] > 0) { $a['hp'] = min($a['max_hp'], $a['hp'] + $rs['heal']); $log[] = ['type' => 'system', 'text' => "🌿 {$a['username']} 生命脈動 +{$rs['heal']} HP"]; }
+        if ($rs['reflect'] > 0) { $b['hp'] -= $rs['reflect']; $log[] = ['type' => 'system', 'text' => "🌵 {$a['username']} 荊棘爆發！{$b['username']} 受到 {$rs['reflect']} 傷害"]; }
 
-                if ($rs['heal'] > 0) {
-                    $a['hp'] = min($a['max_hp'], $a['hp'] + $rs['heal']);
-                    $log[] = ['type' => 'system', 'text' => "🌿 {$a['username']} 生命脈動 +{$rs['heal']} HP"];
-                }
-
-                if ($rs['reflect'] > 0) {
-                    $b['hp'] -= $rs['reflect'];
-                    $log[] = ['type' => 'system', 'text' => "🌵 {$a['username']} 荊棘爆發！{$b['username']} 受到 {$rs['reflect']} 傷害"];
-                }
-            } else {
-                $rs = skill_round_start($b['build'], $ss_b, $b['hp'], $b['max_hp']);
-
-                if ($rs['heal'] > 0) {
-                    $b['hp'] = min($b['max_hp'], $b['hp'] + $rs['heal']);
-                    $log[] = ['type' => 'system', 'text' => "🌿 {$b['username']} 生命脈動 +{$rs['heal']} HP"];
-                }
-
-                if ($rs['reflect'] > 0) {
-                    $a['hp'] -= $rs['reflect'];
-                    $log[] = ['type' => 'system', 'text' => "🌵 {$b['username']} 荊棘爆發！{$a['username']} 受到 {$rs['reflect']} 傷害"];
-                }
-            }
-        }
+        $rs = skill_round_start($b['build'], $ss_b, $b['hp'], $b['max_hp']);
+        if ($rs['heal'] > 0) { $b['hp'] = min($b['max_hp'], $b['hp'] + $rs['heal']); $log[] = ['type' => 'system', 'text' => "🌿 {$b['username']} 生命脈動 +{$rs['heal']} HP"]; }
+        if ($rs['reflect'] > 0) { $a['hp'] -= $rs['reflect']; $log[] = ['type' => 'system', 'text' => "🌵 {$b['username']} 荊棘爆發！{$a['username']} 受到 {$rs['reflect']} 傷害"]; }
 
         if ($a['hp'] <= 0 || $b['hp'] <= 0) {
             break;
         }
 
         foreach ($order as $turn) {
-            if ($a['hp'] <= 0 || $b['hp'] <= 0) {
-                break;
-            }
+            if ($a['hp'] <= 0 || $b['hp'] <= 0) break;
 
             if ($turn === 'a') {
-                $crit_r = $a['crit_rate'];
-
-                if ($ss_a['vengeance_ready']) {
-                    $crit_r = 100;
-                    $ss_a['vengeance_ready'] = false;
-                }
-
-                $eff_def = skill_get_effective_def($b['build'], $b['hp'], $b['max_hp'], max(0, $b['def'] - $corr_on_b));
-                $hunt = skill_hunting_bonus($a['build'], $b['hp'], $b['max_hp']);
-                $eff_atk = (int)($a['atk'] * (1 + $hunt));
-                $hit = calculate_damage($eff_atk, $eff_def, $crit_r, $b['dodge_rate']);
-
-                if ($hit['dodged']) {
-                    $log[] = ['type' => 'dodge', 'text' => "💨 {$b['username']} 閃避了 {$a['username']} 的攻擊！"];
-                } else {
-                    $b['hp'] -= $hit['damage'];
-                    $prefix = $hit['crit'] ? "💥 爆擊！" : "";
-                    $log[] = [
-                        'type' => ($hit['crit'] ? 'crit' : 'attack'),
-                        'text' => "{$prefix}{$a['username']} 造成 {$hit['damage']} 傷害。{$b['username']} 剩餘 HP：" . max(0, $b['hp']),
-                    ];
-
-                    $sa = skill_on_player_attack($a['build'], $ss_a, $hit, $b['hp'], $b['max_hp'], $corr_on_b);
-                    if ($sa['extra'] > 0) {
-                        $b['hp'] -= $sa['extra'];
-                        $log[] = ['type' => 'system', 'text' => "{$a['username']} {$sa['log']}"];
-                    }
-
-                    $take_r = skill_on_player_take_dmg($b['build'], $ss_b, $hit, $hit['damage']);
-                    if ($take_r['log']) {
-                        $log[] = ['type' => 'system', 'text' => "{$b['username']} {$take_r['log']}"];
-                    }
-                }
+                _pvp_do_attack($a, $b, $ss_a, $ss_b, $corr_on_b, $log);
             } else {
-                $crit_r = $b['crit_rate'];
-
-                if ($ss_b['vengeance_ready']) {
-                    $crit_r = 100;
-                    $ss_b['vengeance_ready'] = false;
-                }
-
-                $eff_def = skill_get_effective_def($a['build'], $a['hp'], $a['max_hp'], max(0, $a['def'] - $corr_on_a));
-                $hunt = skill_hunting_bonus($b['build'], $a['hp'], $a['max_hp']);
-                $eff_atk = (int)($b['atk'] * (1 + $hunt));
-                $hit = calculate_damage($eff_atk, $eff_def, $crit_r, $a['dodge_rate']);
-
-                if ($hit['dodged']) {
-                    $log[] = ['type' => 'dodge', 'text' => "💨 {$a['username']} 閃避了 {$b['username']} 的攻擊！"];
-                } else {
-                    $a['hp'] -= $hit['damage'];
-                    $prefix = $hit['crit'] ? "💥 爆擊！" : "";
-                    $log[] = [
-                        'type' => ($hit['crit'] ? 'crit' : 'attack'),
-                        'text' => "{$prefix}{$b['username']} 造成 {$hit['damage']} 傷害。{$a['username']} 剩餘 HP：" . max(0, $a['hp']),
-                    ];
-
-                    $sa = skill_on_player_attack($b['build'], $ss_b, $hit, $a['hp'], $a['max_hp'], $corr_on_a);
-                    if ($sa['extra'] > 0) {
-                        $a['hp'] -= $sa['extra'];
-                        $log[] = ['type' => 'system', 'text' => "{$b['username']} {$sa['log']}"];
-                    }
-
-                    $take_r = skill_on_player_take_dmg($a['build'], $ss_a, $hit, $hit['damage']);
-                    if ($take_r['log']) {
-                        $log[] = ['type' => 'system', 'text' => "{$a['username']} {$take_r['log']}"];
-                    }
-                }
+                _pvp_do_attack($b, $a, $ss_b, $ss_a, $corr_on_a, $log);
             }
 
-            if ($a['hp'] <= 0) {
-                $ud = skill_check_undying($a['build'], $ss_a, $a['max_hp']);
-                if ($ud['revived']) {
-                    $a['hp'] = $ud['new_hp'];
-                    $log[] = ['type' => 'system', 'text' => $ud['log']];
-                }
-            }
-
-            if ($b['hp'] <= 0) {
-                $ud = skill_check_undying($b['build'], $ss_b, $b['max_hp']);
-                if ($ud['revived']) {
-                    $b['hp'] = $ud['new_hp'];
-                    $log[] = ['type' => 'system', 'text' => $ud['log']];
-                }
-            }
+            _pvp_undying_check($a, $ss_a, $log);
+            _pvp_undying_check($b, $ss_b, $log);
         }
     }
 
