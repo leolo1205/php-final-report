@@ -92,186 +92,57 @@ $exp_percent = $exp_needed > 0 ? min(100, ($user['exp'] / $exp_needed) * 100) : 
 <head>
     <title>玄墨的城鎮</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="assets/style.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #e0e0e0; padding: 20px; margin: 0; }
-        .container { display: flex; gap: 15px; flex-wrap: wrap; max-width: 850px; width: 100%; margin: 0 auto; justify-content: center; }
-        .panel { background: #2b2b36; padding: 15px; border-radius: 10px; box-shadow: 0 6px 12px rgba(0,0,0,0.3); flex: 1; min-width: 280px; border: 1px solid #3f3f4e; display: flex; flex-direction: column;}
-        h2 { margin-top: 0; margin-bottom: 10px; font-size: 20px; color: #ffffff; border-bottom: 2px solid #4caf50; padding-bottom: 8px; }
-        h3 { margin-top: 0; margin-bottom: 10px; font-size: 18px; color: #ffffff; border-bottom: 2px solid #4caf50; padding-bottom: 8px; }
-        .msg { background: #1a4325; color: #a5d6a7; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #2e7d32; line-height: 1.5; font-size: 14px; min-height: 22px; transition: all 0.3s ease;}
-        .progress-container { width: 100%; background-color: #424242; border-radius: 6px; margin: 4px 0 10px 0; overflow: hidden; height: 18px; position: relative; }
-        .progress-bar { height: 100%; background-color: #4caf50; transition: width 0.3s ease; }
-        .progress-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 11px; line-height: 18px; color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000; }
-        .resource-bar { display: flex; justify-content: space-between; align-items: center; background: #22222b; padding: 8px 12px; border-radius: 6px; border: 1px solid #3f3f4e; margin-bottom: 10px; font-size: 14px;}
-        .stats-container { display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;}
-        .stat-row { display: flex; justify-content: space-between; align-items: center; background: #353542; padding: 8px 12px; border-radius: 6px; font-size: 14px;}
-        .stat-name { font-weight: bold; color: #ccc;}
-        .stat-value { font-size: 15px; font-weight: bold; margin-left: auto; margin-right: 12px;}
-        .stat-raw { font-size: 11px; color: #64748b; margin-left: 4px; font-weight: normal; }
-        .btn-add { background: #ff9800; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: bold; font-size: 12px;}
-        .btn-add:hover { background: #fb8c00;}
-        button { border: none; padding: 10px 15px; font-size: 14px; border-radius: 6px; width: 100%; font-weight: bold; transition: opacity 0.2s; cursor: pointer; }
-        button:hover { opacity: 0.8; }
-        .btn-train { background-color: #4caf50; color: white; margin-bottom: 8px; }
-        .btn-claim { background-color: #ff9800; color: white; margin-bottom: 8px; animation: pulse 1.5s infinite; }
-        .btn-reset { background-color: transparent; color: #f44336; border: 1px solid #f44336; font-size: 12px; padding: 6px;}
-        .btn-reset:hover { background-color: #f44336; color: white; }
-        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 152, 0, 0.4); } 50% { transform: scale(1.02); box-shadow: 0 0 10px rgba(255, 152, 0, 0.8); } 100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 152, 0, 0.4); } }
-        .tower-list { flex-grow: 1; overflow-y: auto; max-height: 380px; padding-right: 8px; margin-top: 5px; }
-        .tower-list::-webkit-scrollbar { width: 6px; }
-        .tower-list::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-        .floor-item { display: block; padding: 10px; margin-bottom: 8px; border-radius: 6px; text-align: center; font-weight: bold; text-decoration: none; color: #fff; transition: transform 0.1s; font-size: 14px;}
-        .floor-item:active { transform: scale(0.98); }
-        .floor-cleared { background-color: #2e7d32; border: 1px solid #1b5e20; }
-        .floor-current { background-color: #f57f17; border: 1px solid #bc5100; color: #fff; }
-        .floor-locked { background-color: #424242; border: 1px solid #212121; color: #757575; cursor: not-allowed; }
-        .opt-btn {
-            padding:9px 6px;border-radius:7px;border:1px solid #2a2a4a;
-            background:#0d0d1a;color:#94a3b8;font-size:12px;font-weight:600;
-            text-align:center;transition:all .15s;
-        }
-        .opt-btn.selected { border-color:#4fc3f7;color:#4fc3f7;background:rgba(79,195,247,.1); }
-        .opt-btn:hover { border-color:#4fc3f7;color:#e0e0e0; }
-        .mode-card {
-            background:#0d0d1a;border:2px solid #2a2a4a;border-radius:10px;
-            padding:18px 12px;text-align:center;cursor:pointer;transition:all .2s;
-        }
-        .mode-card:hover { border-color:#4fc3f7; }
-        .mode-card.selected { border-color:#4fc3f7;background:rgba(79,195,247,.08); }
-
-        /* 左側城鎮牆壁選單 */
-        .town-wall {
-            position: fixed;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            width: 220px;
-            background: #141427;
-            border-right: 1px solid #2a2a4a;
-            z-index: 50;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 12px 0 35px rgba(0,0,0,.35);
-        }
-        .wall-logo { padding: 26px 22px 20px; border-bottom: 1px solid #2a2a4a; }
-        .wall-logo .icon { font-size: 34px; display: block; margin-bottom: 8px; }
-        .wall-logo h2 { font-size: 17px; color: #4fc3f7; letter-spacing: 2px; margin: 0; border: 0; padding: 0; }
-        .wall-logo p { font-size: 11px; color: #7d8fa3; margin-top: 4px; }
-        .wall-nav { padding: 8px 0; flex: 1; }
-        .wall-section { padding: 14px 22px 6px; color: #7d8fa3; font-size: 11px; letter-spacing: 2px; }
-        .wall-link {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            padding: 12px 22px;
-            color: #b0bec5;
-            text-decoration: none;
-            border-left: 3px solid transparent;
-            transition: all .18s ease;
-            font-size: 14px;
-        }
-        .wall-link:hover { color: #e0e0e0; background: rgba(79,195,247,.07); border-left-color: #4fc3f7; }
-        .wall-link.active { color: #4fc3f7; background: rgba(79,195,247,.12); border-left-color: #4fc3f7; font-weight: 700; }
-        .wall-footer { padding: 16px 22px 20px; border-top: 1px solid #2a2a4a; }
-        .wall-player { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-        .wall-player .avatar {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background: linear-gradient(135deg,#1565c0,#4fc3f7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .wall-player .name { color: #e0e0e0; font-size: 13px; font-weight: 700; }
-        .wall-player .level { color: #7d8fa3; font-size: 11px; }
-        .wall-logout {
-            display: block;
-            text-align: center;
-            padding: 10px;
-            border: 1px solid #b71c1c;
-            border-radius: 8px;
-            color: #ef5350;
-            text-decoration: none;
-            font-size: 13px;
-            transition: all .18s ease;
-        }
-        .wall-logout:hover { background: rgba(183,28,28,.16); color: #ff8a80; }
-
-        @media (min-width: 1200px) {
-            body { padding-left: 240px; }
-            .container { transform: translateX(-90px); }
-        }
-        @media (min-width: 761px) and (max-width: 1199px) {
-            body { padding-left: 240px; }
-        }
-        @media (max-width: 760px) {
-            body { padding: 16px 16px 82px; }
-            .town-wall {
-                top: auto;
-                right: 0;
-                width: 100%;
-                height: 64px;
-                border-right: 0;
-                border-top: 1px solid #2a2a4a;
-                flex-direction: row;
-            }
-            .wall-logo, .wall-section, .wall-footer { display: none; }
-            .wall-nav { width: 100%; display: flex; padding: 0; overflow-x: auto; }
-            .wall-link {
-                flex: 1 0 auto;
-                min-width: 86px;
-                justify-content: center;
-                flex-direction: column;
-                gap: 3px;
-                padding: 8px 10px;
-                border-left: 0;
-                border-top: 3px solid transparent;
-                font-size: 12px;
-            }
-            .wall-link:hover, .wall-link.active { border-left: 0; border-top-color: #4fc3f7; }
-        }
+/* index 頁面專屬 */
+.index-container { display:flex; gap:15px; flex-wrap:wrap; max-width:850px; width:100%; margin:0 auto; justify-content:center; }
+.panel { background:var(--bg-card); padding:15px; border-radius:10px; box-shadow:0 6px 12px rgba(0,0,0,.3); flex:1; min-width:280px; border:1px solid var(--border); display:flex; flex-direction:column; }
+h2 { margin-top:0; margin-bottom:10px; font-size:20px; color:#ffffff; border-bottom:2px solid var(--accent-green); padding-bottom:8px; }
+h3 { margin-top:0; margin-bottom:10px; font-size:18px; color:#ffffff; border-bottom:2px solid var(--accent-green); padding-bottom:8px; }
+.progress-container { width:100%; background-color:#424242; border-radius:6px; margin:4px 0 10px 0; overflow:hidden; height:18px; position:relative; }
+.progress-bar-hp { height:100%; background-color:var(--accent-green); transition:width 0.3s ease; }
+.progress-text { position:absolute; width:100%; text-align:center; top:0; left:0; font-size:11px; line-height:18px; color:#fff; font-weight:bold; text-shadow:1px 1px 2px #000; }
+.resource-bar { display:flex; justify-content:space-between; align-items:center; background:#22222b; padding:8px 12px; border-radius:6px; border:1px solid var(--border); margin-bottom:10px; font-size:14px; }
+.stats-container { display:flex; flex-direction:column; gap:6px; margin-bottom:15px; }
+.stat-row { display:flex; justify-content:space-between; align-items:center; background:#353542; padding:8px 12px; border-radius:6px; font-size:14px; }
+.stat-name { font-weight:bold; color:#ccc; }
+.stat-value { font-size:15px; font-weight:bold; margin-left:auto; margin-right:12px; }
+.stat-raw { font-size:11px; color:var(--text-dim); margin-left:4px; font-weight:normal; }
+.btn-add { background:#ff9800; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer; font-weight:bold; font-size:12px; }
+.btn-add:hover { background:#fb8c00; }
+.btn-train { background-color:var(--accent-green); color:white; margin-bottom:8px; border:none; padding:10px 15px; font-size:14px; border-radius:6px; width:100%; font-weight:bold; cursor:pointer; }
+.btn-train:hover { opacity:.8; }
+.btn-reset { background-color:transparent; color:var(--accent-red); border:1px solid var(--accent-red); font-size:12px; padding:6px; border-radius:6px; width:100%; cursor:pointer; }
+.btn-reset:hover { background-color:var(--accent-red); color:white; }
+@keyframes pulse { 0%{transform:scale(1);} 50%{transform:scale(1.02);box-shadow:0 0 10px rgba(255,152,0,.8);} 100%{transform:scale(1);} }
+.tower-list { flex-grow:1; overflow-y:auto; max-height:380px; padding-right:8px; margin-top:5px; }
+.tower-list::-webkit-scrollbar { width:6px; }
+.tower-list::-webkit-scrollbar-thumb { background:#555; border-radius:3px; }
+.floor-item { display:block; padding:10px; margin-bottom:8px; border-radius:6px; text-align:center; font-weight:bold; text-decoration:none; color:#fff; transition:transform 0.1s; font-size:14px; }
+.floor-item:active { transform:scale(.98); }
+.floor-cleared { background-color:#2e7d32; border:1px solid #1b5e20; }
+.floor-current { background-color:#f57f17; border:1px solid #bc5100; color:#fff; }
+.floor-locked { background-color:#424242; border:1px solid #212121; color:#757575; cursor:not-allowed; }
+.opt-btn { padding:9px 6px; border-radius:7px; border:1px solid var(--border); background:var(--bg-base); color:var(--text-muted); font-size:12px; font-weight:600; text-align:center; transition:all .15s; }
+.opt-btn.selected { border-color:var(--accent-blue); color:var(--accent-blue); background:rgba(79,195,247,.1); }
+.opt-btn:hover { border-color:var(--accent-blue); color:var(--text-primary); }
+.mode-card { background:var(--bg-base); border:2px solid var(--border); border-radius:10px; padding:18px 12px; text-align:center; cursor:pointer; transition:all .2s; }
+.mode-card:hover { border-color:var(--accent-blue); }
+.mode-card.selected { border-color:var(--accent-blue); background:rgba(79,195,247,.08); }
     </style>
 </head>
 <body>
-
-<aside class="town-wall">
-    <div class="wall-logo">
-        <span class="icon">⚔️</span>
-        <h2>塔城傳說</h2>
-        <p>TAR GAME TOWN</p>
-    </div>
-
-    <nav class="wall-nav">
-        <div class="wall-section">城鎮設施</div>
-        <a href="index.php" class="wall-link active">🏠 <span>主城鎮</span></a>
-        <a href="skills_build.php" class="wall-link">⚔️ <span>技能樹</span></a>
-        <a href="forge.php" class="wall-link">⚒️ <span>裝備鍛造</span></a>
-        <a href="arena.php" class="wall-link">🏟️ <span>競技場</span></a>
-        <a href="skills.php" class="wall-link">📖 <span>被動技能</span></a>
-    </nav>
-
-    <div class="wall-footer">
-        <div class="wall-player">
-            <div class="avatar">👤</div>
-            <div>
-                <div class="name"><?php echo htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'); ?></div>
-                <div class="level">Lv.<?php echo (int)$user['level']; ?> 冒險者</div>
-            </div>
-        </div>
-        <a href="logout.php" class="wall-logout">⏻ 登出</a>
-    </div>
-</aside>
-
-<div class="container">
+<?php require '_sidebar.php'; ?>
+<div class="page-body">
+<div class="index-container">
     <div class="panel">
         <h2>🧑‍🚀 <?php echo htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'); ?> <span style="font-size: 14px; color: #aaa;">(Lv. <?php echo $user['level']; ?>)</span></h2>
 
-        <div class='msg'><?php echo $msg; ?></div>
+        <div class='msg-box'><?php echo $msg; ?></div>
 
         <p style="margin-bottom: 4px; font-weight: bold; color: #bbb; font-size: 14px;">✨ EXP</p>
         <div class="progress-container">
-            <div class="progress-bar" style="width: <?php echo $exp_percent; ?>%;"></div>
+            <div class="progress-bar-hp" style="width: <?php echo $exp_percent; ?>%;"></div>
             <div class="progress-text"><?php echo $user['exp']; ?> / <?php echo $exp_needed; ?> (<?php echo round($exp_percent, 1); ?>%)</div>
         </div>
 
@@ -551,5 +422,7 @@ document.getElementById('auto-modal').addEventListener('click', function(e) {
     if (e.target === this) closeAutoModal();
 });
 </script>
+</div><!-- /index-container -->
+</div><!-- /page-body -->
 </body>
 </html>
