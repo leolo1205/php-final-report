@@ -241,6 +241,7 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
 <head>
     <title>探索第 <?php echo $target_floor; ?> 層</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="assets/style.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; padding: 20px; background-color: #1e1e24; color: #e0e0e0; margin: 0; }
         .tower-container { max-width: 700px; margin: 0 auto; padding-bottom: 80px; }
@@ -254,6 +255,8 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
     </style>
 </head>
 <body>
+<?php require '_sidebar.php'; ?>
+<div class="page-body">
 <div class="tower-container">
     <h2>⚔️ 探索第 <?php echo $target_floor; ?> 層</h2>
     <?php echo $old_log; echo $new_log; ?>
@@ -283,5 +286,6 @@ document.addEventListener("DOMContentLoaded", function() {
     if(items.length > 0) setTimeout(revealNext, 250);
 });
 </script>
+</div><!-- /page-body -->
 </body>
 </html>
