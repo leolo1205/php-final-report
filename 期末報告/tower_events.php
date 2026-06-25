@@ -3,16 +3,24 @@
 
 if ($event === 'merchant') {
     $run['state'] = 'wait_merchant';
-    $form_html = "<p>「嘿嘿嘿... 冒險者，要不要來抽個盲盒？一半天堂，一半地獄喔...」</p><form method='post' style='display:flex; gap:10px; margin-top:10px; flex-wrap: wrap;'>" . csrf_field() . "<button type='submit' name='action' value='merch_A' class='btn-action' style='background:#f44336;'>🔴 拍下紅色按鈕</button><button type='submit' name='action' value='merch_B' class='btn-action' style='background:#2196f3;'>🔵 拍下藍色按鈕</button><button type='submit' name='action' value='merch_leave' class='btn-action' style='background:#757575;'>🚶 轉身離開</button></form>";
-    $add_line($form_html, 100); 
-    $stop_loop = true; // 標記需要暫停迴圈等待輸入
+    if (($auto['mode'] ?? 'manual') === 'manual') {
+        $form_html = "<p>「嘿嘿嘿... 冒險者，要不要來抽個盲盒？一半天堂，一半地獄喔...」</p><form method='post' style='display:flex; gap:10px; margin-top:10px; flex-wrap: wrap;'>" . csrf_field() . "<button type='submit' name='action' value='merch_A' class='btn-action' style='background:#f44336;'>🔴 拍下紅色按鈕</button><button type='submit' name='action' value='merch_B' class='btn-action' style='background:#2196f3;'>🔵 拍下藍色按鈕</button><button type='submit' name='action' value='merch_leave' class='btn-action' style='background:#757575;'>🚶 轉身離開</button></form>";
+        $add_line($form_html, 100);
+        $stop_loop = true;
+    } else {
+        $add_line("<p>「嘿嘿嘿... 冒險者，要不要來抽個盲盒？一半天堂，一半地獄喔...」</p>", 100);
+    }
 
 } elseif ($event === 'buy_exp') {
     $run['state'] = 'wait_exp';
     $cost = 5 * $target_floor; $gain = 10 * $target_floor;
-    $form_html = "<p>「知識就是力量，給我 $cost 金幣，我傳授你 $gain 經驗值。」</p><form method='post' style='display:flex; gap:10px; margin-top:10px;'>" . csrf_field() . "<button type='submit' name='action' value='exp_yes' class='btn-action' style='background:#4caf50;'>💰 支付金幣</button><button type='submit' name='action' value='exp_no' class='btn-action' style='background:#757575;'>🚶 轉身離開</button></form>";
-    $add_line($form_html, 100); 
-    $stop_loop = true;
+    if (($auto['mode'] ?? 'manual') === 'manual') {
+        $form_html = "<p>「知識就是力量，給我 $cost 金幣，我傳授你 $gain 經驗值。」</p><form method='post' style='display:flex; gap:10px; margin-top:10px;'>" . csrf_field() . "<button type='submit' name='action' value='exp_yes' class='btn-action' style='background:#4caf50;'>💰 支付金幣</button><button type='submit' name='action' value='exp_no' class='btn-action' style='background:#757575;'>🚶 轉身離開</button></form>";
+        $add_line($form_html, 100);
+        $stop_loop = true;
+    } else {
+        $add_line("<p>「知識就是力量，給我 $cost 金幣，我傳授你 $gain 經驗值。」</p>", 100);
+    }
 
 } elseif ($event === 'gold') {
     $found_gold = rand(20, 50) * $target_floor; $run['gold'] += $found_gold;
