@@ -222,9 +222,9 @@ while ($run['state'] === 'auto' && $run['node'] <= 30) {
     $new_log .= $node_new . "</div>"; $run['log'] .= $node_old . "</div>";
     $new_log .= "<div class='stat-snap hidden-item' data-delay='1'"
         . " data-hp='" . (int)$run['hp'] . "'"
-        . " data-mhp='" . ((int)$user['max_hp'] + (int)($run['buffs']['max_hp'] ?? 0)) . "'"
-        . " data-atk='" . ((int)$user['dmg'] + (int)($run['buffs']['dmg'] ?? 0)) . "'"
-        . " data-def='" . ((int)$user['def'] + (int)($run['buffs']['def'] ?? 0)) . "'"
+        . " data-mhp='" . ((int)$_eff['hp']['value'] + (int)($run['buffs']['max_hp'] ?? 0)) . "'"
+        . " data-atk='" . ((int)$_eff['atk']['value'] + (int)($run['buffs']['dmg'] ?? 0)) . "'"
+        . " data-def='" . ((int)$_eff['def']['value'] + (int)($run['buffs']['def'] ?? 0)) . "'"
         . " data-gold='" . (int)$run['gold'] . "'"
         . " data-node='" . (int)$run['node'] . "'"
         . " style='position:absolute;width:0;height:0;overflow:hidden;'></div>";

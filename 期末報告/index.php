@@ -31,8 +31,30 @@ if (isset($_POST['add_stat'])) {
     }
 }
 
+// --- 處理修改玩家名稱 ---
+if (isset($_POST['change_username'])) {
+    $new_name = trim($_POST['new_username'] ?? '');
+    if (mb_strlen($new_name) < 2 || mb_strlen($new_name) > 12) {
+        $msg .= "<span style='color:#f44336;'>❌ 名稱長度需為 2~12 個字元。</span><br>";
+    } else {
+        $check = $conn->prepare("SELECT id FROM users WHERE username=? AND id!=?");
+        $check->bind_param('si', $new_name, $user_id);
+        $check->execute();
+        if ($check->get_result()->num_rows > 0) {
+            $msg .= "<span style='color:#f44336;'>❌ 此名稱已被使用。</span><br>";
+        } else {
+            $upd = $conn->prepare("UPDATE users SET username=? WHERE id=?");
+            $upd->bind_param('si', $new_name, $user_id);
+            $upd->execute();
+            $_SESSION['player_name'] = $new_name;
+            $msg .= "<span style='color:#4caf50;'>✅ 名稱已更新為「{$new_name}」。</span><br>";
+        }
+        $check->close();
+    }
+}
+
 // --- 處理重置帳號 ---
-if (isset($_POST['reset_account'])) {
+if (isset($_POST['reset_account']) && ($_POST['reset_confirm'] ?? '') === 'RESET') {
     $reset_sql = "UPDATE users SET level=1, exp=0, hp=100, max_hp=100, dmg=10, def=0, stat_points=0, max_floor=0, gold=0, last_train_time=NULL WHERE id = $user_id";
     $conn->query($reset_sql);
     $conn->query("DELETE FROM user_skills WHERE user_id = $user_id");
@@ -96,7 +118,7 @@ $exp_percent = $exp_needed > 0 ? min(100, ($user['exp'] / $exp_needed) * 100) : 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>玄墨的城鎮</title>
+    <title><?= htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8') ?>的城鎮</title>
     <meta charset="utf-8">
     <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="assets/style.css">
@@ -256,10 +278,35 @@ h3 { margin-top:0; margin-bottom:10px; font-size:18px; color:#ffffff; border-bot
         </div>
         <?php endif; ?>
 
-        <form method="post" onsubmit="return confirm('⚠️ 警告：即將重置帳號！\n等級、屬性、金幣、塔層數將全部歸零。\n\n確定要重新開始嗎？');">
-            <?= csrf_field() ?>
-            <button type="submit" name="reset_account" class="btn-reset">🚨 重置帳號</button>
-        </form>
+        <!-- 帳號設定 -->
+        <div style="margin-top:16px;border-top:1px solid #2a2a4a;padding-top:14px;">
+            <div style="font-size:12px;color:#94a3b8;letter-spacing:1px;margin-bottom:10px;">⚙️ 帳號設定</div>
+
+            <!-- 修改名稱 -->
+            <form method="post" style="display:flex;gap:6px;margin-bottom:10px;">
+                <?= csrf_field() ?>
+                <input type="text" name="new_username" placeholder="新玩家名稱（2~12字）"
+                    style="flex:1;padding:8px 10px;background:#0d111a;border:1px solid #2a2a4a;border-radius:6px;color:#e0e0e0;font-size:13px;">
+                <button type="submit" name="change_username"
+                    style="padding:8px 14px;background:#1565c0;border:none;border-radius:6px;color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">
+                    ✏️ 改名
+                </button>
+            </form>
+
+            <!-- 重置帳號 -->
+            <div style="background:#1a0a0a;border:1px solid #4a1010;border-radius:8px;padding:10px;">
+                <div style="font-size:12px;color:#f44336;margin-bottom:8px;">🚨 重置帳號（等級、屬性、金幣、塔層數歸零）</div>
+                <form method="post" style="display:flex;gap:6px;align-items:center;">
+                    <?= csrf_field() ?>
+                    <input type="text" name="reset_confirm" placeholder="輸入 RESET 確認"
+                        style="flex:1;padding:8px 10px;background:#0d111a;border:1px solid #4a1010;border-radius:6px;color:#e0e0e0;font-size:13px;">
+                    <button type="submit" name="reset_account"
+                        style="padding:8px 14px;background:#c62828;border:none;border-radius:6px;color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">
+                        確認重置
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <div class="panel">
