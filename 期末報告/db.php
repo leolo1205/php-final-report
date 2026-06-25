@@ -15,9 +15,9 @@ if (session_status() === PHP_SESSION_NONE) {
     ]);
 }
 
-$host   = 'localhost';
+$host   = 'db_33';
 $user   = 'root';
-$pass   = '';
+$pass   = '88a72e00b1ef2ee59f66e8b4effd39bc';
 $dbname = 'targame';
 
 $conn = new mysqli($host, $user, $pass, $dbname);
