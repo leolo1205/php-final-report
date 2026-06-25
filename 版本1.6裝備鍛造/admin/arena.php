@@ -14,13 +14,13 @@ if (isset($_POST['weekly_settle'])) {
 
 $r1 = $conn->query("SELECT COUNT(*) FROM pvp_battles");
 $total_battles = ($r1 !== false) ? ($r1->fetch_row()[0] ?? 0) : 0;
-$r2 = $conn->query("SELECT COUNT(*) FROM pvp_rankings");
+$r2 = $conn->query("SELECT COUNT(*) FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE u.is_bot=0");
 $total_players = ($r2 !== false) ? ($r2->fetch_row()[0] ?? 0) : 0;
 $r3 = $conn->query("SELECT COUNT(*) FROM pvp_battles WHERE DATE(created_at)=CURDATE()");
 $today_battles = ($r3 !== false) ? ($r3->fetch_row()[0] ?? 0) : 0;
 
 $rankings = [];
-$res = $conn->query("SELECT r.*,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id ORDER BY r.rating DESC LIMIT 20");
+$res = $conn->query("SELECT r.*,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE u.is_bot=0 ORDER BY r.rating DESC LIMIT 20");
 if ($res !== false) while ($r = $res->fetch_assoc()) $rankings[] = $r;
 
 $recent = [];

@@ -239,6 +239,7 @@ if (isset($_POST['sim_atk'])) {
                     <span class="badge">generate_monster()</span>
                 </div>
 
+                <div style="padding:18px 22px 22px;">
                 <form method="POST" style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:18px;">
                     <?= csrf_field() ?>
                     <input
@@ -249,7 +250,6 @@ if (isset($_POST['sim_atk'])) {
                         value="<?= htmlspecialchars($_POST['preview_floor'] ?? '1') ?>"
                         style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;"
                     >
-
                     <select
                         name="preview_type"
                         style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;"
@@ -257,7 +257,6 @@ if (isset($_POST['sim_atk'])) {
                         <option value="mob" <?= ($_POST['preview_type'] ?? '') === 'mob' ? 'selected' : '' ?>>小怪</option>
                         <option value="boss" <?= ($_POST['preview_type'] ?? '') === 'boss' ? 'selected' : '' ?>>BOSS</option>
                     </select>
-
                     <button type="submit" class="btn btn-primary">預覽</button>
                 </form>
 
@@ -275,7 +274,7 @@ if (isset($_POST['sim_atk'])) {
                             <div style="font-size:17px;font-weight:700;color:#e0e0e0;">
                                 <?= htmlspecialchars($name) ?>
                             </div>
-                            <div style="font-size:12px;color:#8899b0;margin-top:3px;">
+                            <div style="font-size:12px;color:#94a3b8;margin-top:3px;">
                                 第 <?= (int)$preview_monster['floor'] ?> 層 · <?= $type_label ?> · Lv.<?= (int)$stats['level'] ?>
                             </div>
                         </div>
@@ -287,29 +286,30 @@ if (isset($_POST['sim_atk'])) {
                     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center;">
                         <div style="background:#0d0d1a;padding:10px;border-radius:7px;">
                             <div style="color:#ef5350;font-weight:700;"><?= number_format((int)$stats['hp']) ?></div>
-                            <div style="font-size:11px;color:#666;">HP</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:3px;">HP</div>
                         </div>
                         <div style="background:#0d0d1a;padding:10px;border-radius:7px;">
                             <div style="color:#ff8a65;font-weight:700;"><?= number_format((int)$stats['dmg']) ?></div>
-                            <div style="font-size:11px;color:#666;">DMG</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:3px;">DMG</div>
                         </div>
                         <div style="background:#0d0d1a;padding:10px;border-radius:7px;">
                             <div style="color:#4fc3f7;font-weight:700;"><?= number_format((int)$stats['def']) ?></div>
-                            <div style="font-size:11px;color:#666;">DEF</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:3px;">DEF</div>
                         </div>
                         <div style="background:#0d0d1a;padding:10px;border-radius:7px;">
                             <div style="color:#66bb6a;font-weight:700;"><?= number_format((int)$stats['exp']) ?></div>
-                            <div style="font-size:11px;color:#666;">EXP</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:3px;">EXP</div>
                         </div>
                         <div style="background:#0d0d1a;padding:10px;border-radius:7px;">
                             <div style="color:#ffca28;font-weight:700;"><?= number_format((int)$stats['gold']) ?></div>
-                            <div style="font-size:11px;color:#666;">GOLD</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:3px;">GOLD</div>
                         </div>
                     </div>
                 </div>
                 <?php else: ?>
-                <div style="text-align:center;color:#444;padding:30px;">輸入樓層後點擊預覽</div>
+                <div style="text-align:center;color:#94a3b8;padding:30px;">輸入樓層後點擊預覽</div>
                 <?php endif; ?>
+                </div><!-- /padding wrapper -->
             </div>
 
             <!-- 傷害計算模擬 -->
@@ -319,52 +319,51 @@ if (isset($_POST['sim_atk'])) {
                     <span class="badge">calculate_damage()</span>
                 </div>
 
-                <form method="POST" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+                <div style="padding:18px 22px 22px;">
+                <form method="POST" style="margin-bottom:18px;">
                     <?= csrf_field() ?>
-                    <input
-                        type="number"
-                        name="sim_atk"
-                        min="1"
-                        value="<?= htmlspecialchars($_POST['sim_atk'] ?? '100') ?>"
-                        placeholder="ATK"
-                        style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;"
-                    >
-
-                    <input
-                        type="number"
-                        name="sim_def"
-                        min="0"
-                        value="<?= htmlspecialchars($_POST['sim_def'] ?? '20') ?>"
-                        placeholder="DEF"
-                        style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;"
-                    >
-
-                    <input
-                        type="number"
-                        name="sim_crit"
-                        min="0"
-                        max="100"
-                        value="<?= htmlspecialchars($_POST['sim_crit'] ?? '10') ?>"
-                        placeholder="CRIT %"
-                        style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;"
-                    >
-
-                    <input
-                        type="number"
-                        name="sim_dodge"
-                        min="0"
-                        max="100"
-                        value="<?= htmlspecialchars($_POST['sim_dodge'] ?? '10') ?>"
-                        placeholder="DODGE %"
-                        style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;"
-                    >
-
-                    <button type="submit" class="btn btn-primary" style="grid-column:1 / -1;">模擬 100 次</button>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
+                        <input
+                            type="number"
+                            name="sim_atk"
+                            min="1"
+                            value="<?= htmlspecialchars($_POST['sim_atk'] ?? '100') ?>"
+                            placeholder="ATK"
+                            style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;width:100%;"
+                        >
+                        <input
+                            type="number"
+                            name="sim_def"
+                            min="0"
+                            value="<?= htmlspecialchars($_POST['sim_def'] ?? '20') ?>"
+                            placeholder="DEF"
+                            style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;width:100%;"
+                        >
+                        <input
+                            type="number"
+                            name="sim_crit"
+                            min="0"
+                            max="100"
+                            value="<?= htmlspecialchars($_POST['sim_crit'] ?? '10') ?>"
+                            placeholder="CRIT %"
+                            style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;width:100%;"
+                        >
+                        <input
+                            type="number"
+                            name="sim_dodge"
+                            min="0"
+                            max="100"
+                            value="<?= htmlspecialchars($_POST['sim_dodge'] ?? '10') ?>"
+                            placeholder="DODGE %"
+                            style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:7px;color:#e0e0e0;padding:10px;width:100%;"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">模擬 100 次</button>
                 </form>
 
                 <?php if ($dmg_sim): ?>
                 <div style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:10px;padding:16px;">
-                    <div style="font-size:13px;color:#8899b0;margin-bottom:12px;">
+                    <div style="font-size:13px;color:#94a3b8;margin-bottom:12px;">
                         ATK <?= number_format($dmg_sim['atk']) ?> /
                         DEF <?= number_format($dmg_sim['def']) ?> /
                         CRIT <?= number_format($dmg_sim['crit']) ?>% /
@@ -374,21 +373,22 @@ if (isset($_POST['sim_atk'])) {
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center;">
                         <div style="background:#1a1a2e;padding:12px;border-radius:7px;">
                             <div style="font-size:22px;font-weight:700;color:#4fc3f7;"><?= number_format($dmg_sim['avg'], 1) ?></div>
-                            <div style="font-size:11px;color:#666;">平均傷害</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">平均傷害</div>
                         </div>
                         <div style="background:#1a1a2e;padding:12px;border-radius:7px;">
                             <div style="font-size:22px;font-weight:700;color:#ffca28;"><?= number_format($dmg_sim['crit_pct']) ?>%</div>
-                            <div style="font-size:11px;color:#666;">實際爆擊率</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">實際爆擊率</div>
                         </div>
                         <div style="background:#1a1a2e;padding:12px;border-radius:7px;">
                             <div style="font-size:22px;font-weight:700;color:#66bb6a;"><?= number_format($dmg_sim['dodge_pct']) ?>%</div>
-                            <div style="font-size:11px;color:#666;">實際閃避率</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">實際閃避率</div>
                         </div>
                     </div>
                 </div>
                 <?php else: ?>
-                <div style="text-align:center;color:#444;padding:30px;">輸入參數後點擊模擬</div>
+                <div style="text-align:center;color:#94a3b8;padding:30px;">輸入參數後點擊模擬</div>
                 <?php endif; ?>
+                </div><!-- /padding wrapper -->
             </div>
         </div>
 

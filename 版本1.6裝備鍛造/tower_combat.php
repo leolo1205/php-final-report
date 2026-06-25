@@ -41,7 +41,14 @@ $f_data = get_floor_data($target_floor);
 $m_lvl = $is_boss ? $f_data['boss_level'] : $f_data['mob_level'];
 $m_name = $is_boss ? "<span style='color:#f44336; font-weight:bold;'>💀 Boss: Lv.$m_lvl {$f_data['boss_name']}</span>" : "🦇 Lv.$m_lvl {$f_data['mob_name']}";
 
-$m_stats = isset($monster_db[$m_lvl]) ? $monster_db[$m_lvl] : ['hp' => $m_lvl * 100, 'dmg' => $m_lvl * 10, 'def' => floor($m_lvl * 1.5), 'exp' => $m_lvl * 40, 'gold' => $m_lvl * 30];
+// 備援公式：從第20層的已知數值線性延伸（每級 hp+220 dmg+16 def+3 exp+96 gold+70）
+$m_stats = isset($monster_db[$m_lvl]) ? $monster_db[$m_lvl] : [
+    'hp'   => 2000 + ($m_lvl - 20) * 220,
+    'dmg'  => 180  + ($m_lvl - 20) * 16,
+    'def'  => 30   + ($m_lvl - 20) * 3,
+    'exp'  => 800  + ($m_lvl - 20) * 96,
+    'gold' => 600  + ($m_lvl - 20) * 70,
+];
 
 // BOSS 狀態初始化
 $is_special_boss = ($is_boss && $f_data['is_special']);
@@ -91,7 +98,7 @@ while ($run['hp'] > 0 && $m_hp > 0) {
     }
 
     // ── 玩家攻擊 ──
-    $eff_m_def_corroded = max(0, (int)($m_stats['def'] ?? $m_def) - $enemy_corr);  // 侵蝕削減後的怪物防禦
+    $eff_m_def_corroded = max(0, $m_def - $enemy_corr);  // 侵蝕削減後的怪物防禦（基於實際縮放後的 def）
     $eff_m_def = ($boss_vars['defense_turns'] > 0) ? $eff_m_def_corroded * 3 : $eff_m_def_corroded;
 
     // 報復之刃：本回合必爆
@@ -152,14 +159,18 @@ while ($run['hp'] > 0 && $m_hp > 0) {
             $p_def_eff = skill_get_effective_def($p_build, $run['hp'], $p_max_hp_with_bonus, $p_def_base);
             $eff_m_dmg = $is_special_atk ? floor($m_dmg * 1.4) : $m_dmg;
 
+            // 不滅之軀免疫：復活後下一次受傷減半
+            if ($skill_ss['undying_immune']) {
+                $eff_m_dmg = (int)ceil($eff_m_dmg / 2);
+            }
+
             $mon_hit = execute_attack(strip_tags($m_name), $run['hp'], $eff_m_dmg, $p_def_eff, $m_crit, $p_dodge_rate, false, true, $is_special_atk, $node_new, $node_old, $run);
 
-            // 不滅之軀免疫減傷
-            if ($skill_ss['undying_immune'] && $mon_hit['hit'] && $run['hp'] < 0) {
-                $run['hp'] = 1; // 先拉回，由下方不滅攔截
-            }
+            // 不滅之軀：命中後消耗免疫
             if ($skill_ss['undying_immune'] && $mon_hit['hit'] && $mon_hit['damage'] > 0) {
-                $skill_ss['undying_immune'] = false; // 免疫消耗
+                $skill_ss['undying_immune'] = false;
+                $node_new .= "<div class='reveal-item hidden-item' data-delay='150'><span style='color:#ce93d8;'>🛡️ 不滅之軀：傷害減半！</span></div>";
+                $node_old  .= "<div><span style='color:#ce93d8;'>🛡️ 不滅之軀：傷害減半！</span></div>";
             }
 
             // 受傷後技能效果（荊棘積累、報復之刃）
@@ -181,6 +192,13 @@ while ($run['hp'] > 0 && $m_hp > 0) {
             $node_old .= "<div><span style='color:#ce93d8;'>{$ud['log']}</span></div>";
         }
     }
+    // 撤退保險觸發
+    if ($run['hp'] > 0 && !empty($run['retreat_insured']) && $run['hp'] <= (int)($p_max_hp_with_bonus * 0.3)) {
+        $node_new .= "<div class='reveal-item hidden-item' data-delay='300'><span style='color:#ff9800;font-weight:bold;'>🛡️ 撤退保險觸發！立即撤出！</span></div>";
+        $node_old .= "<div><span style='color:#ff9800;font-weight:bold;'>🛡️ 撤退保險觸發！立即撤出！</span></div>";
+        $run['state'] = 'retreat';
+        break;
+    }
 }
 
 $node_new .= "</div>"; $node_old .= "</div>";
@@ -188,6 +206,8 @@ $node_new .= "</div>"; $node_old .= "</div>";
 if ($run['hp'] <= 0) {
     $add_line("<p style='color:#f44336; font-weight:bold;'>你被擊敗了... 探索中斷。</p>", 1000);
     $run['state'] = 'dead';
+} elseif ($run['state'] === 'retreat') {
+    $add_line("<p style='color:#ff9800;'>🛡️ 你緊急撤出了戰場，保住了身上的金幣與經驗！</p>", 1000);
 } else {
     $run['exp'] += $m_exp; $run['gold'] += $m_gold;
     $add_line("<p style='color:#4caf50;'>戰鬥勝利！剩餘 HP: {$run['hp']}，獲得 <span style='color:#64b5f6;'>$m_exp EXP</span> 與 <span style='color:gold;'>$m_gold 金幣</span>。</p>", 1000);

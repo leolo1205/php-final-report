@@ -43,7 +43,6 @@ function check_training_cooldown($conn, $user_id) {
             'is_training' => false,
             'seconds_remaining' => 0,
             'duration_sec' => 0,
-            'plan_key' => '',
         ];
     }
 
@@ -58,23 +57,13 @@ function check_training_cooldown($conn, $user_id) {
             'is_training' => false,
             'seconds_remaining' => 0,
             'duration_sec' => 0,
-            'plan_key' => '',
         ];
-    }
-
-    $plan_key = '';
-    foreach (get_train_plans() as $key => $plan) {
-        if ($plan['duration_sec'] === $duration) {
-            $plan_key = $key;
-            break;
-        }
     }
 
     return [
         'is_training' => true,
         'seconds_remaining' => $remaining,
         'duration_sec' => $duration,
-        'plan_key' => $plan_key,
     ];
 }
 
@@ -103,8 +92,20 @@ function start_training($conn, $user_id, $plan_key = 'short') {
     $stat = (int)$plan['stat'];
     $dur = (int)$plan['duration_sec'];
 
-    $conn->query("UPDATE users SET last_train_time=NOW(), train_duration=$dur, exp=exp+$exp, stat_points=stat_points+$stat WHERE id=$user_id");
-    $conn->query("INSERT INTO training_logs (user_id, exp_gained, stat_points_gained) VALUES ($user_id, $exp, $stat)");
+    // 原子性更新：WHERE 確保 last_train_time 仍為 NULL（防止並發雙重領獎）
+    $stmt = $conn->prepare("UPDATE users SET last_train_time=NOW(), train_duration=?, exp=exp+?, stat_points=stat_points+? WHERE id=? AND last_train_time IS NULL");
+    $stmt->bind_param('iiii', $dur, $exp, $stat, $user_id);
+    $stmt->execute();
+    if ($stmt->affected_rows !== 1) {
+        $stmt->close();
+        return ['success' => false, 'message' => '訓練已在冷卻中，無法重複領取'];
+    }
+    $stmt->close();
+
+    $stmt2 = $conn->prepare("INSERT INTO training_logs (user_id, exp_gained, stat_points_gained) VALUES (?,?,?)");
+    $stmt2->bind_param('iii', $user_id, $exp, $stat);
+    $stmt2->execute();
+    $stmt2->close();
 
     return [
         'success' => true,
@@ -116,12 +117,3 @@ function start_training($conn, $user_id, $plan_key = 'short') {
     ];
 }
 
-/**
- * 舊版相容：獎勵已改為開始訓練時立即發放
- */
-function claim_training_reward($conn, $user_id) {
-    return [
-        'success' => false,
-        'message' => '獎勵已在訓練開始時發放',
-    ];
-}

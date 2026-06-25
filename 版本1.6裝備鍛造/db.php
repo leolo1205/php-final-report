@@ -1,11 +1,23 @@
 <?php
 // 正式環境：程式層保底，確保錯誤不顯示給使用者（.htaccess 為主要設定）
-@ini_set('display_errors', 0);
-@ini_set('log_errors', 1);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Session Cookie 安全屬性（必須在 session_start() 之前設定）
+if (session_status() === PHP_SESSION_NONE) {
+    $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'secure'   => $secure,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+}
 
 $host   = 'localhost';
-$user   = 'root';
-$pass   = '';
+$user   = 'targame_app';          // 最小權限帳號（僅 SELECT/INSERT/UPDATE/DELETE）
+$pass   = 'targame_2026_Secure!'; // 正式部署時建議改用環境變數或獨立 config 檔
 $dbname = 'targame';
 
 $conn = new mysqli($host, $user, $pass, $dbname);

@@ -24,14 +24,14 @@ try {
         case 'get_status':
             ensure_pvp_ranking($conn, $user_id);
             $my = $conn->query("SELECT r.*,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE r.user_id=$user_id")->fetch_assoc();
-            $rank_row = $conn->query("SELECT COUNT(*)+1 AS r FROM pvp_rankings WHERE rating>(SELECT rating FROM pvp_rankings WHERE user_id=$user_id)")->fetch_assoc();
+            $rank_row = $conn->query("SELECT COUNT(*)+1 AS r FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE r.rating>(SELECT rating FROM pvp_rankings WHERE user_id=$user_id) AND u.is_bot=0")->fetch_assoc();
             $cd = (int)$conn->query("SELECT GREATEST(0, 60 - TIMESTAMPDIFF(SECOND, last_challenge, NOW())) FROM pvp_rankings WHERE user_id=$user_id")->fetch_row()[0];
             $result = ['success'=>true, 'my'=>$my, 'rank'=>(int)$rank_row['r'], 'cooldown'=>$cd];
             break;
 
         case 'get_rankings':
             $rows = [];
-            $res = $conn->query("SELECT r.user_id,r.rating,r.wins,r.losses,r.streak,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id ORDER BY r.rating DESC LIMIT 20");
+            $res = $conn->query("SELECT r.user_id,r.rating,r.wins,r.losses,r.streak,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE u.is_bot=0 ORDER BY r.rating DESC LIMIT 20");
             while ($r = $res->fetch_assoc()) $rows[] = $r;
             $result = ['success'=>true, 'rankings'=>$rows];
             break;
@@ -39,7 +39,7 @@ try {
         case 'get_opponents':
             ensure_pvp_ranking($conn, $user_id);
             $rows = [];
-            $res = $conn->query("SELECT r.user_id,r.rating,r.wins,r.losses,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE r.user_id!=$user_id ORDER BY ABS(r.rating-(SELECT rating FROM pvp_rankings WHERE user_id=$user_id)) ASC LIMIT 10");
+            $res = $conn->query("SELECT r.user_id,r.rating,r.wins,r.losses,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE r.user_id!=$user_id AND u.is_bot=0 ORDER BY ABS(r.rating-(SELECT rating FROM pvp_rankings WHERE user_id=$user_id)) ASC LIMIT 10");
             while ($r = $res->fetch_assoc()) $rows[] = $r;
             $result = ['success'=>true, 'opponents'=>$rows];
             break;
@@ -72,5 +72,8 @@ try {
     $result = ['success'=>false,'message'=>'伺服器發生錯誤，請稍後再試'];
 }
 
-$result['_ms'] = (int)((microtime(true)-$t_start)*1000);
+$ms = (int)((microtime(true) - $t_start) * 1000);
+$log_status = ($result['success'] ?? false) ? 'success' : 'fail';
+log_api($conn, 'pvp', $action, $user_id, $log_status, $ms, ['action' => $action], $result);
+$result['_ms'] = $ms;
 echo json_encode($result, JSON_UNESCAPED_UNICODE);

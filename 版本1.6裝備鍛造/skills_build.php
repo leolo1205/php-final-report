@@ -7,7 +7,7 @@ require_once 'lib/functions.php';
 
 if (!isset($_SESSION['player_id'])) { header('Location: login.php'); exit; }
 $user_id = (int)$_SESSION['player_id'];
-$user    = $conn->query("SELECT username, gold FROM users WHERE id=$user_id")->fetch_assoc();
+$user    = $conn->query("SELECT username, gold, level FROM users WHERE id=$user_id")->fetch_assoc();
 $build   = get_skill_build($conn, $user_id);
 $bonus   = get_skill_stat_bonus($build);
 $costs   = get_node_costs();

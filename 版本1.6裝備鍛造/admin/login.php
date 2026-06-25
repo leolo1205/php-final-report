@@ -2,9 +2,11 @@
 session_start();
 if (isset($_SESSION['admin_logged_in'])) { header('Location: index.php'); exit; }
 require_once '../db.php';
+require_once '../lib/session.php';
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_verify()) { $error = '安全驗證失敗，請重新整理後再試。'; goto skip_post; }
     // 速率限制：5 次失敗鎖定 15 分鐘
     $rl_key = 'rl_admin_page_' . md5($_SERVER['REMOTE_ADDR'] ?? '');
     if (!isset($_SESSION[$rl_key])) $_SESSION[$rl_key] = ['fails' => 0, 'since' => 0];
@@ -35,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION[$rl_key]['fails']++;
         if ($_SESSION[$rl_key]['fails'] === 1) $_SESSION[$rl_key]['since'] = time();
     }
+    skip_post:;
 }
 ?>
 <!DOCTYPE html>
@@ -112,6 +115,7 @@ body{
   <div class="error-msg">⚠ <?= htmlspecialchars($error) ?></div>
   <?php endif; ?>
   <form method="POST" autocomplete="off">
+    <?= csrf_field() ?>
     <div class="form-group">
       <label>管理員帳號</label>
       <input type="text" name="username" placeholder="admin" required autofocus>

@@ -12,13 +12,13 @@ ensure_pvp_ranking($conn, $user_id);
 
 // 我的資料
 $my = $conn->query("SELECT r.*,u.username,u.level,u.dmg,u.def,u.max_hp FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE r.user_id=$user_id")->fetch_assoc();
-$my_rank = (int)$conn->query("SELECT COUNT(*)+1 AS r FROM pvp_rankings WHERE rating>{$my['rating']}")->fetch_row()[0];
+$my_rank = (int)$conn->query("SELECT COUNT(*)+1 AS r FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE r.rating>{$my['rating']} AND u.is_bot=0")->fetch_row()[0];
 $cd = (int)$conn->query("SELECT GREATEST(0, 60 - TIMESTAMPDIFF(SECOND, last_challenge, NOW())) FROM pvp_rankings WHERE user_id=$user_id")->fetch_row()[0];
 $eq = get_equipment_bonus($conn, $user_id);
 
 // 排行榜 Top 20
 $rankings = [];
-$res = $conn->query("SELECT r.user_id,r.rating,r.wins,r.losses,r.streak,u.username,u.level,u.is_bot FROM pvp_rankings r JOIN users u ON r.user_id=u.id ORDER BY r.rating DESC LIMIT 20");
+$res = $conn->query("SELECT r.user_id,r.rating,r.wins,r.losses,r.streak,u.username,u.level FROM pvp_rankings r JOIN users u ON r.user_id=u.id WHERE u.is_bot=0 ORDER BY r.rating DESC LIMIT 20");
 while ($r = $res->fetch_assoc()) $rankings[] = $r;
 
 // 可挑戰對手（積分最近的前10人，含電腦玩家）
@@ -28,7 +28,7 @@ while ($r = $res->fetch_assoc()) $opponents[] = $r;
 
 // 最近對戰紀錄
 $history = [];
-$res = $conn->query("SELECT b.id,b.winner_id,b.challenger_rating_change,b.defender_rating_change,b.created_at,uc.username AS cn,ud.username AS dn,uw.username AS wn FROM pvp_battles b JOIN users uc ON b.challenger_id=uc.id JOIN users ud ON b.defender_id=ud.id JOIN users uw ON b.winner_id=uw.id WHERE b.challenger_id=$user_id OR b.defender_id=$user_id ORDER BY b.created_at DESC LIMIT 5");
+$res = $conn->query("SELECT b.id,b.challenger_id,b.winner_id,b.challenger_rating_change,b.defender_rating_change,b.created_at,uc.username AS cn,ud.username AS dn,uw.username AS wn FROM pvp_battles b JOIN users uc ON b.challenger_id=uc.id JOIN users ud ON b.defender_id=ud.id JOIN users uw ON b.winner_id=uw.id WHERE b.challenger_id=$user_id OR b.defender_id=$user_id ORDER BY b.created_at DESC LIMIT 5");
 while ($r = $res->fetch_assoc()) $history[] = $r;
 ?>
 <!DOCTYPE html>
@@ -89,7 +89,7 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
 </style>
 </head>
 <body>
-<?php require '_sidebar.php'; ?>
+<?php $user = $my; require '_sidebar.php'; ?>
 <div class="page-body">
 <div class="arena-wrap">
 
@@ -105,7 +105,7 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
 
   <!-- 左欄：我的戰績 -->
   <div>
-    <div class="card">
+    <div class="card-sm">
       <div class="card-header"><h3>⚔️ 我的戰績</h3><span style="font-size:12px;color:#555;">第 <?= $my_rank ?> 名</span></div>
       <div class="card-body">
         <div style="font-size:11px;color:#555;text-align:center;margin-bottom:4px;letter-spacing:2px;">積分</div>
@@ -158,7 +158,7 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
   <!-- 右欄 -->
   <div>
     <!-- 挑戰名單 -->
-    <div class="card" style="margin-bottom:20px;">
+    <div class="card-sm" style="margin-bottom:20px;">
       <div class="card-header"><h3>🗡️ 挑戰對手</h3><span style="font-size:12px;color:#555;">按積分排序（最近的前10人）</span></div>
       <div class="card-body" style="padding:10px 20px;">
         <?php if (empty($opponents)): ?>
@@ -192,7 +192,7 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
     </div>
 
     <!-- 排行榜 -->
-    <div class="card">
+    <div class="card-sm">
       <div class="card-header"><h3>🏆 積分排行榜</h3><span style="font-size:12px;color:#555;">Top 20</span></div>
       <table class="rank-table">
         <thead><tr><th>#</th><th>玩家</th><th>等級</th><th>積分</th><th>勝</th><th>敗</th><th>連勝</th></tr></thead>

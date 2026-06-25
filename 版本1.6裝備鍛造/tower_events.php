@@ -19,8 +19,9 @@ if ($event === 'merchant') {
     $add_line("<p>💰 發現寶箱！獲得 <span style='color:gold;'>$found_gold 金幣</span>！</p>", 1000);
 
 } elseif ($event === 'heal') {
-    $heal = floor($user['max_hp'] * 0.2); 
-    $run['hp'] = min($user['max_hp'] + $run['buffs']['max_hp'], $run['hp'] + $heal);
+    $eff_max_hp = $user['max_hp'] + $run['buffs']['max_hp'];
+    $heal = floor($eff_max_hp * 0.2);
+    $run['hp'] = min($eff_max_hp, $run['hp'] + $heal);
     $add_line("<p>🧪 找到神聖甘泉，恢復 20% 生命。<span style='color:#4caf50;'>+$heal HP</span> (目前: {$run['hp']})</p>", 1000);
 
 } elseif ($event === 'buff') {
@@ -35,8 +36,9 @@ if ($event === 'merchant') {
 } elseif ($event === 'rest') {
     $rest_texts = ["你找到了一個避風的角落，生起營火稍微休息了一下。", "周圍暫時沒有危險，你坐下來整理裝備，喘了口氣。", "此處風景不錯，你停下腳步欣賞了一會兒，感覺精神好多了。", "你靠在樹幹上閉目養神，微風拂過，帶走了一絲疲憊。"];
     $random_text = $rest_texts[array_rand($rest_texts)];
-    $heal = max(1, floor($user['max_hp'] * 0.05)); 
-    $run['hp'] = min($user['max_hp'] + $run['buffs']['max_hp'], $run['hp'] + $heal);
+    $eff_max_hp = $user['max_hp'] + $run['buffs']['max_hp'];
+    $heal = max(1, floor($eff_max_hp * 0.05));
+    $run['hp'] = min($eff_max_hp, $run['hp'] + $heal);
     $add_line("<p>⛺ $random_text <span style='color:#4caf50;'>回復 $heal HP</span> (目前: {$run['hp']})</p>", 1000);
 
 } elseif ($event === 'trap') {
@@ -46,19 +48,23 @@ if ($event === 'merchant') {
     if ($run['hp'] <= 0) $run['state'] = 'dead';
 
 } elseif ($event === 'curse') {
-    $buff_types = ['dmg' => '傷害', 'def' => '防禦']; 
-    $keys = array_keys($buff_types); 
-    $b_key = $keys[array_rand($keys)]; 
-    $b_val = rand(1, 3); 
-    $run['buffs'][$b_key] -= $b_val; 
+    $buff_types = ['dmg' => '傷害', 'def' => '防禦'];
+    $keys = array_keys($buff_types);
+    $b_key = $keys[array_rand($keys)];
+    $b_val = rand(1, 3);
+    // 詛咒不讓 buff 跌到負值（最多讓總值降至基礎值）
+    $run['buffs'][$b_key] = max(-$user[$b_key], $run['buffs'][$b_key] - $b_val);
     $current_val = $user[$b_key] + $run['buffs'][$b_key];
     $add_line("<p style='color:#ba68c8;'>👿 遭遇惡毒的詛咒！你感覺力量正在流失...<br><span style='color:#e53935;'>{$buff_types[$b_key]} -$b_val (當前: $current_val)</span></p>", 1000);
 
 } elseif ($event === 'blessing') {
-    $run['buffs']['dmg'] += ceil(($user['dmg'] + $run['buffs']['dmg']) * 0.2);
-    $run['buffs']['def'] += ceil(($user['def'] + $run['buffs']['def']) * 0.2);
-    $run['buffs']['max_hp'] += ceil(($user['max_hp'] + $run['buffs']['max_hp']) * 0.2);
-    $run['hp'] = $user['max_hp'] + $run['buffs']['max_hp']; 
+    // 祝福每次固定增加基礎值的 20%，避免複利無限成長
+    $max_hp_cap = $user['max_hp'] * 2; // 上限：基礎 max_hp 的 2 倍
+    $run['buffs']['dmg']    += ceil($user['dmg']    * 0.2);
+    $run['buffs']['def']    += ceil($user['def']    * 0.2);
+    $new_hp_buff = $run['buffs']['max_hp'] + ceil($user['max_hp'] * 0.2);
+    $run['buffs']['max_hp'] = min($max_hp_cap - $user['max_hp'], $new_hp_buff);
+    $run['hp'] = $user['max_hp'] + $run['buffs']['max_hp'];
     $add_line("<p style='color:#ffd700; font-weight:bold; font-size: 16px;'>✨ 奇蹟降臨！神明的祝福籠罩著你！<br>生命值完全恢復，且全屬性提升 20%！</p>", 1500);
 }
 ?>

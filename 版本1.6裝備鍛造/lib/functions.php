@@ -266,12 +266,10 @@ function do_pvp_challenge($conn, $challenger_id, $defender_id) {
     $w_new = max(0, (int)$wr['rating'] + $change['winner_gain']);
     $l_new = max(0, (int)$lr['rating'] - $change['loser_loss']);
 
-    $conn->query("UPDATE pvp_rankings SET rating=$w_new, wins=wins+1, streak=streak+1, last_challenge=NOW() WHERE user_id=$winner_id");
+    $conn->query("UPDATE pvp_rankings SET rating=$w_new, wins=wins+1, streak=streak+1 WHERE user_id=$winner_id");
     $conn->query("UPDATE pvp_rankings SET rating=$l_new, losses=losses+1, streak=0 WHERE user_id=$loser_id");
-
-    if ($loser_id === $challenger_id) {
-        $conn->query("UPDATE pvp_rankings SET last_challenge=NOW() WHERE user_id=$challenger_id");
-    }
+    // 挑戰者無論勝負都進冷卻；防守方也更新以防止同一人反覆被挑戰
+    $conn->query("UPDATE pvp_rankings SET last_challenge=NOW() WHERE user_id IN ($challenger_id, $defender_id)");
 
     $log_json = $conn->real_escape_string(json_encode($result['log'], JSON_UNESCAPED_UNICODE));
     $w_change = ($winner_id === $challenger_id) ? $change['winner_gain'] : -$change['loser_loss'];
@@ -345,7 +343,8 @@ function pvp_weekly_settle($conn) {
     }
 
     $reset_where = $has_is_bot ? 'WHERE u.is_bot=0' : '';
-    $conn->query("UPDATE pvp_rankings r JOIN users u ON r.user_id=u.id SET r.rating=1000, r.wins=0, r.losses=0, r.streak=0 $reset_where");
+    // 賽季重置：高於 1000 的玩家重置到 1000；低於 1000 的保留現有積分（不送免費加分）
+    $conn->query("UPDATE pvp_rankings r JOIN users u ON r.user_id=u.id SET r.rating=LEAST(r.rating, 1000), r.wins=0, r.losses=0, r.streak=0 $reset_where");
 
     return [
         'settled' => count($players),

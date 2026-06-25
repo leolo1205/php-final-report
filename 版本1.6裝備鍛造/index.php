@@ -56,6 +56,11 @@ if ($lv_result['leveled_up']) {
 }
 $user = $conn->query("SELECT * FROM users WHERE id = $user_id")->fetch_assoc();
 
+// --- 爬塔失敗冷卻狀態 ---
+$tower_fail_until_ts = !empty($user['tower_fail_until']) ? strtotime($user['tower_fail_until']) : 0;
+$tower_cooling = $tower_fail_until_ts > time();
+$tower_cd_secs = $tower_cooling ? ($tower_fail_until_ts - time()) : 0;
+
 // --- 計算訓練冷卻狀態 ---
 $cooldown     = check_training_cooldown($conn, $user_id);
 $train_state  = $cooldown['is_training'] ? 'cooling' : 'idle';
@@ -92,6 +97,7 @@ $exp_percent = $exp_needed > 0 ? min(100, ($user['exp'] / $exp_needed) * 100) : 
 <head>
     <title>玄墨的城鎮</title>
     <meta charset="utf-8">
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="assets/style.css">
     <style>
 /* index 頁面專屬 */
@@ -256,18 +262,30 @@ h3 { margin-top:0; margin-bottom:10px; font-size:18px; color:#ffffff; border-bot
     </div>
 
     <div class="panel">
-        <h3>🏰 爬塔挑戰 (上限 20 層)</h3>
+        <h3>🏰 爬塔挑戰 (上限 100 層)</h3>
         <p style="font-size: 14px;">目前最高通關層數：第 <b style="color: #4caf50; font-size: 18px;"><?php echo $user['max_floor']; ?></b> 層</p>
+
+        <?php if ($tower_cooling): ?>
+        <div style="background:#3b1a1a; border:1px solid #f44336; border-radius:8px; padding:12px; margin-bottom:12px; text-align:center;">
+            <div style="color:#f44336; font-weight:bold; margin-bottom:4px;">⛔ 爬塔冷卻中</div>
+            <div style="color:#aaa; font-size:13px;">上次挑戰失敗，休息後再出征</div>
+            <div id="tower-cd-display" style="color:#ffca28; font-size:18px; font-weight:bold; margin-top:6px;"></div>
+        </div>
+        <?php endif; ?>
 
         <div class="tower-list">
             <?php
-            for ($i = 1; $i <= 20; $i++) {
-                if ($i <= $user['max_floor'])
-                    echo "<div class='floor-item floor-cleared' onclick='openAutoModal($i)' style='cursor:pointer;'>✅ 第 $i 層 (反覆探索)</div>";
-                elseif ($i == $user['max_floor'] + 1)
-                    echo "<div class='floor-item floor-current' id='current-floor' onclick='openAutoModal($i)' style='cursor:pointer;'>⚔️ 挑戰第 $i 層</div>";
-                else
-                    echo "<div class='floor-item floor-locked'>🔒 第 $i 層 (未解鎖)</div>";
+            for ($i = 1; $i <= 100; $i++) {
+                $ms = ($i % 10 === 0) ? "border-left:3px solid #ff9800;" : "";
+                if ($tower_cooling) {
+                    echo "<div class='floor-item floor-locked' title='爬塔冷卻中' style='{$ms}'>⛔ 第 $i 層 (冷卻中)</div>";
+                } elseif ($i <= $user['max_floor']) {
+                    echo "<div class='floor-item floor-cleared' onclick='openAutoModal($i)' style='cursor:pointer;{$ms}'>✅ 第 $i 層 (反覆探索)</div>";
+                } elseif ($i == $user['max_floor'] + 1) {
+                    echo "<div class='floor-item floor-current' id='current-floor' onclick='openAutoModal($i)' style='cursor:pointer;{$ms}'>⚔️ 挑戰第 $i 層</div>";
+                } else {
+                    echo "<div class='floor-item floor-locked' style='{$ms}'>🔒 第 $i 層 (未解鎖)</div>";
+                }
             }
             ?>
         </div>
@@ -329,16 +347,25 @@ h3 { margin-top:0; margin-bottom:10px; font-size:18px; color:#ffffff; border-bot
                 </div>
             </div>
 
-            <!-- 緊急撤退 -->
-            <div style="margin-bottom:20px;">
-                <div style="font-size:11px;color:#94a3b8;letter-spacing:1px;margin-bottom:8px;">🩸 HP 低於以下比例時自動撤退</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <?php foreach([0=>['不撤退','#555'],20=>['20%','#ff9800'],30=>['30%','#ef5350'],50=>['50%','#b71c1c']] as $pct=>$info): ?>
-                    <label style="cursor:pointer;"><input type="radio" name="retreat_hp" value="<?= $pct ?>" <?= $pct===0?'checked':'' ?> style="display:none;">
-                        <div class="opt-btn <?= $pct===0?'selected':'' ?>" data-group="retreat_hp" data-val="<?= $pct ?>"
-                            style="<?= $pct>0?"border-color:{$info[1]};":'' ?>"><?= $info[0] ?></div></label>
-                    <?php endforeach; ?>
-                </div>
+        </div>
+
+        <!-- 撤退保險 -->
+        <div style="height:1px;background:#1f2937;margin:8px 0 16px;"></div>
+        <div style="margin-bottom:4px;">
+            <div style="font-size:11px;color:#94a3b8;letter-spacing:1px;margin-bottom:8px;">🛡️ 撤退保險（血量 ≤ 30% 時自動撤退，不算失敗）</div>
+            <div style="display:flex;gap:8px;">
+                <label style="flex:1;cursor:pointer;"><input type="radio" name="retreat_insure" value="insure_yes" style="display:none;">
+                    <div class="opt-btn" data-group="retreat_insure" data-val="insure_yes"
+                         <?php if ($user['gold'] < 1000): ?>style="opacity:0.4;cursor:not-allowed;"<?php endif; ?>>
+                        💰 支付 1000 金
+                        <span style="font-size:10px;color:#aaa;display:block;margin-top:2px;">
+                            <?= $user['gold'] < 1000 ? '（金幣不足）' : "（持有 {$user['gold']} 金）" ?>
+                        </span>
+                    </div>
+                </label>
+                <label style="flex:1;cursor:pointer;"><input type="radio" name="retreat_insure" value="insure_no" checked style="display:none;">
+                    <div class="opt-btn selected" data-group="retreat_insure" data-val="insure_no">🚫 不投保</div>
+                </label>
             </div>
         </div>
 
@@ -369,6 +396,20 @@ const t = setInterval(() => {
     cd--;
     if (cd <= 0) { clearInterval(t); location.reload(); return; }
     timerEl.textContent = fmt(cd);
+}, 1000);
+<?php endif; ?>
+<?php if ($tower_cooling): ?>
+let towerCd = <?= $tower_cd_secs ?>;
+const towerCdEl = document.getElementById('tower-cd-display');
+function fmtTower(s) {
+    const m = Math.floor(s/60), sec = s%60;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+if (towerCdEl) towerCdEl.textContent = fmtTower(towerCd);
+const towerTimer = setInterval(() => {
+    towerCd--;
+    if (towerCd <= 0) { clearInterval(towerTimer); location.reload(); return; }
+    if (towerCdEl) towerCdEl.textContent = fmtTower(towerCd);
 }, 1000);
 <?php endif; ?>
 const cur = document.getElementById('current-floor');
@@ -406,15 +447,24 @@ document.querySelectorAll('.opt-btn').forEach(btn => {
 });
 
 function startTower() {
-    if (selectedMode === 'manual') {
-        window.location.href = 'tower.php?floor=' + selectedFloor + '&mode=manual';
-    } else {
-        const merchant   = document.querySelector('input[name="merchant"]:checked').value;
-        const buy_exp    = document.querySelector('input[name="buy_exp"]:checked').value;
-        const retreat_hp = document.querySelector('input[name="retreat_hp"]:checked').value;
-        const params = new URLSearchParams({ floor: selectedFloor, mode: 'auto', merchant, buy_exp, retreat_hp });
-        window.location.href = 'tower.php?' + params.toString();
+    const retreat_insure = document.querySelector('input[name="retreat_insure"]:checked').value;
+    const fields = { floor: selectedFloor, mode: selectedMode, retreat_insure };
+    if (selectedMode === 'auto') {
+        fields.merchant = document.querySelector('input[name="merchant"]:checked').value;
+        fields.buy_exp  = document.querySelector('input[name="buy_exp"]:checked').value;
     }
+    fields.csrf_token = document.querySelector('meta[name="csrf-token"]').content;
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'tower.php';
+    for (const [k, v] of Object.entries(fields)) {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = k; inp.value = v;
+        form.appendChild(inp);
+    }
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // 點背景關閉

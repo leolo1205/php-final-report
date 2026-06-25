@@ -36,11 +36,11 @@ if (isset($_GET['msg'])) { $msg = $_GET['msg']; $msg_type = $_GET['type'] ?? 'su
 $search = trim($_GET['q'] ?? '');
 $filter = $_GET['filter'] ?? 'all';
 
-$where = [];
+$where = ['is_bot=0'];
 if ($search !== '') $where[] = "username LIKE '%".($conn->real_escape_string($search))."%'";
 if ($filter === 'banned') $where[] = "is_banned=1";
 if ($filter === 'active') $where[] = "is_banned=0";
-$where_sql = $where ? 'WHERE '.implode(' AND ', $where) : '';
+$where_sql = 'WHERE '.implode(' AND ', $where);
 
 $players = $conn->query("SELECT u.*,
     (SELECT COUNT(*) FROM user_skills us WHERE us.user_id=u.id) as skill_count,

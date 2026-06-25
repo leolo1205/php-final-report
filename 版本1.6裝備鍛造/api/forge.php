@@ -27,9 +27,13 @@ try {
     switch ($action) {
         case 'get_status':
             $eq = get_equipment($conn, $user_id);
-            $user = $conn->query("SELECT gold FROM users WHERE id=$user_id")->fetch_assoc();
+            $stmt = $conn->prepare("SELECT gold FROM users WHERE id=?");
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            $user = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
 
-            $max_level = forge_max_level();
+            $max_level = FORGE_MAX_LEVEL;
             $equipment = [];
 
             foreach (['weapon', 'armor', 'helmet'] as $type) {
@@ -61,7 +65,7 @@ try {
             break;
 
         case 'upgrade':
-            $type = $_REQUEST['type'] ?? '';
+            $type = $_POST['type'] ?? '';
             $valid_types = ['weapon', 'armor', 'helmet'];
 
             if (!in_array($type, $valid_types, true)) {
@@ -72,14 +76,18 @@ try {
 
             $r = upgrade_equipment($conn, $user_id, $type);
 
-            $user = $conn->query("SELECT gold FROM users WHERE id=$user_id")->fetch_assoc();
+            $stmt = $conn->prepare("SELECT gold FROM users WHERE id=?");
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            $user = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
             $r['gold'] = (int)($user['gold'] ?? 0);
 
             $eq = get_equipment($conn, $user_id);
             $level = (int)$eq[$type]['level'];
             $attempts = (int)$eq[$type]['attempts'];
             $successes = (int)$eq[$type]['successes'];
-            $max_level = forge_max_level();
+            $max_level = FORGE_MAX_LEVEL;
             $multiplier = equipment_multiplier($level);
 
             $r['equipment'] = [
@@ -115,7 +123,7 @@ try {
 
 $ms = (int)((microtime(true) - $t_start) * 1000);
 if (function_exists('log_api')) {
-    log_api($conn, 'forge', $action, $user_id, $status, $ms, $_REQUEST, $result);
+    log_api($conn, 'forge', $action, $user_id, $status, $ms, ['action' => $action, 'type' => $type ?? ''], $result);
 }
 
 echo json_encode($result, JSON_UNESCAPED_UNICODE);

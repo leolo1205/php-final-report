@@ -4,12 +4,7 @@
  * 包含：強化費用、成功率、裝備倍率、裝備初始化、強化處理、玩家有效屬性
  */
 
-/**
- * 裝備最高強化等級
- */
-function forge_max_level() {
-    return 50;
-}
+define('FORGE_MAX_LEVEL', 50);
 
 /**
  * 強化費用
@@ -36,7 +31,7 @@ function forge_upgrade_chance($current_level) {
     $current_level = max(0, (int)$current_level);
     $next_level = $current_level + 1;
 
-    if ($next_level > forge_max_level()) {
+    if ($next_level > FORGE_MAX_LEVEL) {
         return 0;
     }
 
@@ -57,7 +52,7 @@ function forge_upgrade_chance($current_level) {
  * +50 = 1.50x
  */
 function equipment_multiplier($level) {
-    $level = max(0, min(forge_max_level(), (int)$level));
+    $level = max(0, min(FORGE_MAX_LEVEL, (int)$level));
 
     return 1 + ($level * 0.01);
 }
@@ -106,9 +101,6 @@ function get_equipment_bonus($conn, $user_id) {
     $eq = get_equipment($conn, $user_id);
 
     return [
-        'atk' => 0,
-        'def' => 0,
-        'hp' => 0,
         'atk_mult' => equipment_multiplier((int)$eq['weapon']['level']),
         'def_mult' => equipment_multiplier((int)$eq['armor']['level']),
         'hp_mult' => equipment_multiplier((int)$eq['helmet']['level']),
@@ -164,13 +156,8 @@ function get_player_effective_stats($conn, $user_id) {
 
     $eq = get_equipment_bonus($conn, $user_id);
 
-    $build = function_exists('get_skill_build')
-        ? get_skill_build($conn, $user_id)
-        : ['archetype' => null, 'nodes_unlocked' => 0];
-
-    $skill_bonus = function_exists('get_skill_stat_bonus')
-        ? get_skill_stat_bonus($build)
-        : ['atk' => 0, 'def' => 0, 'hp' => 0, 'crit' => 0];
+    $build = get_skill_build($conn, $user_id);
+    $skill_bonus = get_skill_stat_bonus($build);
 
     $raw_atk = (int)$user['dmg'];
     $raw_def = (int)$user['def'];
@@ -227,7 +214,7 @@ function upgrade_equipment($conn, $user_id, $type) {
 
     $eq = get_equipment($conn, $user_id);
     $level = (int)$eq[$type]['level'];
-    $max_level = forge_max_level();
+    $max_level = FORGE_MAX_LEVEL;
 
     if ($level >= $max_level) {
         return [

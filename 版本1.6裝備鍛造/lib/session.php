@@ -60,7 +60,11 @@ function csrf_verify() {
            ?? $_SERVER['HTTP_X_CSRF_TOKEN']
            ?? '';
     $session_token = $_SESSION['csrf_token'] ?? '';
-    return $session_token !== '' && hash_equals($session_token, $token);
+    if ($session_token === '' || !hash_equals($session_token, $token)) {
+        return false;
+    }
+    unset($_SESSION['csrf_token']); // rotate：驗證後強制下次重新產生
+    return true;
 }
 
 function csrf_field() {

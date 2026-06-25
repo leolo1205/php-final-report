@@ -13,9 +13,9 @@ $trainings_today = $conn->query("SELECT COUNT(*) FROM training_logs WHERE DATE(c
 $battles_total   = $conn->query("SELECT COUNT(*) FROM battle_logs")->fetch_row()[0];
 
 // ── 排行榜 ──
-$rank_level = $conn->query("SELECT id,username,level,exp,max_floor FROM users WHERE is_banned=0 ORDER BY level DESC,exp DESC LIMIT 10");
-$rank_gold  = $conn->query("SELECT id,username,level,gold FROM users WHERE is_banned=0 ORDER BY gold DESC LIMIT 10");
-$rank_floor = $conn->query("SELECT id,username,level,max_floor FROM users WHERE is_banned=0 ORDER BY max_floor DESC,level DESC LIMIT 10");
+$rank_level = $conn->query("SELECT id,username,level,exp,max_floor FROM users WHERE is_banned=0 AND is_bot=0 ORDER BY level DESC,exp DESC LIMIT 10");
+$rank_gold  = $conn->query("SELECT id,username,level,gold FROM users WHERE is_banned=0 AND is_bot=0 ORDER BY gold DESC LIMIT 10");
+$rank_floor = $conn->query("SELECT id,username,level,max_floor FROM users WHERE is_banned=0 AND is_bot=0 ORDER BY max_floor DESC,level DESC LIMIT 10");
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">

@@ -1,9 +1,9 @@
 ﻿<?php
 session_start();
 
-// 已登入則直接導向
-if (isset($_SESSION['player_id']))       { header('Location: index.php');       exit; }
-if (isset($_SESSION['admin_logged_in'])) { header('Location: admin/index.php'); exit; }
+// 玩家已登入直接進主城鎮
+if (isset($_SESSION['player_id'])) { header('Location: index.php'); exit; }
+// admin 在此頁面只是想預覽前台，不自動跳回後台（後台有專屬入口 admin/login.php）
 
 require_once 'db.php';
 require_once 'lib/session.php';
@@ -30,6 +30,7 @@ function _rl_wait(array $rl): int { return (int)ceil((900 - (time() - $rl['since
 
 // ── 玩家登入 ──
 if (isset($_POST['type']) && $_POST['type'] === 'player') {
+    if (!csrf_verify()) { $player_error = '安全驗證失敗，請重新整理後再試。'; goto skip_player; }
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
@@ -43,14 +44,11 @@ if (isset($_POST['type']) && $_POST['type'] === 'player') {
         $stmt->execute();
         $player = $stmt->get_result()->fetch_assoc();
 
-        if (!$player) {
-            $player_error = '找不到此玩家帳號';
+        if (!$player || !password_verify($password, $player['password'])) {
+            $player_error = '帳號或密碼錯誤'; // 統一訊息，防止帳號列舉
             _rl_fail($rl_key);
         } elseif ($player['is_banned']) {
-            $player_error = '此帳號已被封鎖，請聯絡管理員';
-        } elseif (!password_verify($password, $player['password'])) {
-            $player_error = '密碼錯誤，請重試';
-            _rl_fail($rl_key);
+            $player_error = '此帳號已被停用，請聯絡管理員';
         } else {
             _rl_ok($rl_key);
             session_regenerate_id(true);
@@ -60,10 +58,12 @@ if (isset($_POST['type']) && $_POST['type'] === 'player') {
             exit;
         }
     }
+    skip_player:;
 }
 
 // ── 管理員登入 ──
 if (isset($_POST['type']) && $_POST['type'] === 'admin') {
+    if (!csrf_verify()) { $admin_error = '安全驗證失敗，請重新整理後再試。'; goto skip_admin; }
     $username = trim($_POST['admin_username'] ?? '');
     $password = $_POST['admin_password'] ?? '';
 
@@ -89,6 +89,7 @@ if (isset($_POST['type']) && $_POST['type'] === 'admin') {
         $admin_error = '管理員帳號或密碼錯誤';
         _rl_fail($rl_key);
     }
+    skip_admin:;
 }
 
 $active = (isset($_POST['type']) && $_POST['type'] === 'admin') ? 'admin' : 'player';
@@ -163,6 +164,7 @@ body { display:flex; align-items:center; justify-content:center; overflow:hidden
 
     <form method="POST" autocomplete="off">
       <input type="hidden" name="type" value="player">
+      <?= csrf_field() ?>
       <div class="form-group">
         <label>玩家名稱</label>
         <input type="text" name="username"
@@ -199,6 +201,7 @@ body { display:flex; align-items:center; justify-content:center; overflow:hidden
 
     <form method="POST" autocomplete="off">
       <input type="hidden" name="type" value="admin">
+      <?= csrf_field() ?>
       <div class="form-group">
         <label>管理員帳號</label>
         <input type="text" name="admin_username"

@@ -38,7 +38,7 @@ $equip_info = [
     ],
 ];
 
-$max_level = forge_max_level();
+$max_level = FORGE_MAX_LEVEL;
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">

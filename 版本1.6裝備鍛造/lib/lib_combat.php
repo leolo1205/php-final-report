@@ -47,17 +47,3 @@ function calculate_defense_stance($atk, $def, $crit_rate = 10, $dodge_rate = 10)
 
     return $result;
 }
-
-/**
- * 計算逃跑成功機率
- */
-function calculate_escape($dodge_level = 0) {
-    $dodge_level = max(0, (int)$dodge_level);
-    $rate = min(80, 40 + $dodge_level * 10);
-    $success = (rand(1, 100) <= $rate);
-
-    return [
-        'success' => $success,
-        'rate' => $rate,
-    ];
-}

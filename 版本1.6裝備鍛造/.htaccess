@@ -1,0 +1,19 @@
+# 禁止目錄列表
+Options -Indexes
+
+# Session Cookie 安全設定（需 Apache mod_php 或 php-fpm + AllowOverride）
+php_value session.cookie_httponly 1
+php_value session.cookie_samesite "Strict"
+# 若正式環境部署 HTTPS，請取消下一行的註解
+# php_value session.cookie_secure 1
+
+# 阻止直接存取 lib/ 與設定檔
+<FilesMatch "\.(sql|log|py|txt|md)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # 阻止直接存取 lib/ 資料夾
+    RewriteRule ^lib/ - [F,L]
+</IfModule>

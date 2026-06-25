@@ -23,7 +23,6 @@ function nav($href, $icon, $label, $current) {
     <?php nav('api_module.php', '🔌', 'API 模組', $current); ?>
     <div class="sidebar-section" style="margin-top:12px;">遊戲前台</div>
     <a href="../index.php" class="sidebar-link" target="_blank">🏠 <span>主城鎮</span></a>
-    <a href="../tower.php" class="sidebar-link" target="_blank">🗼 <span>塔探索</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="sidebar-player">
