@@ -212,6 +212,10 @@ while ($run['state'] === 'auto' && $run['node'] <= 30) {
                 }
             }
         }
+        // 手動模式：遇到需要等待輸入的事件就停住
+        if ($auto['mode'] === 'manual' && in_array($run['state'], ['wait_merchant', 'wait_exp'])) {
+            $stop_loop = true;
+        }
     }
 
     $new_log .= $node_new . "</div>"; $run['log'] .= $node_old . "</div>";

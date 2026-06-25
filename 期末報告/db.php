@@ -16,8 +16,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $host   = 'localhost';
-$user   = 'targame_app';          // 最小權限帳號（僅 SELECT/INSERT/UPDATE/DELETE）
-$pass   = 'targame_2026_Secure!'; // 正式部署時建議改用環境變數或獨立 config 檔
+$user   = 'root';
+$pass   = '';
 $dbname = 'targame';
 
 $conn = new mysqli($host, $user, $pass, $dbname);
