@@ -368,9 +368,10 @@ window.addEventListener('beforeunload', function(e) {
 <?php endif; ?>
 <?php
 $panel_hp     = max(0, (int)($run['hp'] ?? 0));
-$panel_max_hp = max(1, (int)$user['max_hp'] + (int)($run['buffs']['max_hp'] ?? 0));
-$panel_atk    = (int)$user['dmg'] + (int)($run['buffs']['dmg'] ?? 0);
-$panel_def    = (int)$user['def'] + (int)($run['buffs']['def'] ?? 0);
+$_eff         = get_player_effective_stats($conn, $user_id);
+$panel_max_hp = max(1, (int)$_eff['hp']['value'] + (int)($run['buffs']['max_hp'] ?? 0));
+$panel_atk    = (int)$_eff['atk']['value'] + (int)($run['buffs']['dmg'] ?? 0);
+$panel_def    = (int)$_eff['def']['value'] + (int)($run['buffs']['def'] ?? 0);
 $hp_pct       = min(100, (int)round($panel_hp / $panel_max_hp * 100));
 $hp_color     = $hp_pct > 60 ? '#4caf50' : ($hp_pct > 30 ? '#ff9800' : '#f44336');
 $run_node     = min(30, max(1, (int)($run['node'] ?? 1)));
