@@ -141,6 +141,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // 自動模式設定
 $auto = $_SESSION['auto_settings'] ?? ['merchant'=>'merch_leave','buy_exp'=>'exp_no','retreat_hp'=>0];
 
+// 預先計算有效屬性（供 stat-snap 與面板使用）
+$_eff = get_player_effective_stats($conn, $user_id);
+
 // 事件自動推動迴圈
 while ($run['state'] === 'auto' && $run['node'] <= 30) {
 
@@ -368,7 +371,6 @@ window.addEventListener('beforeunload', function(e) {
 <?php endif; ?>
 <?php
 $panel_hp     = max(0, (int)($run['hp'] ?? 0));
-$_eff         = get_player_effective_stats($conn, $user_id);
 $panel_max_hp = max(1, (int)$_eff['hp']['value'] + (int)($run['buffs']['max_hp'] ?? 0));
 $panel_atk    = (int)$_eff['atk']['value'] + (int)($run['buffs']['dmg'] ?? 0);
 $panel_def    = (int)$_eff['def']['value'] + (int)($run['buffs']['def'] ?? 0);
