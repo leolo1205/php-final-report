@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ob_start();
 session_start();
 date_default_timezone_set('Asia/Taipei');
@@ -30,7 +30,7 @@ $arch_info = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
-<title>技能樹 — 塔城傳說</title>
+<title>技能樹 — 異界塔</title>
 <link rel="stylesheet" href="assets/style.css">
 <style>
 /* skills_build 頁面專屬 */

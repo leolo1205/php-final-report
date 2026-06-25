@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // 前台側邊欄 include
 // 需要：$user['username'], $user['level'] 已定義
 $_sb_page = basename($_SERVER['PHP_SELF']);
@@ -6,7 +6,7 @@ $_sb_page = basename($_SERVER['PHP_SELF']);
 <aside class="sidebar">
     <div class="sidebar-logo">
         <span class="logo-icon">⚔️</span>
-        <h2>塔城傳說</h2>
+        <h2>異界塔</h2>
         <p>TAR GAME TOWN</p>
     </div>
     <nav class="sidebar-nav">
