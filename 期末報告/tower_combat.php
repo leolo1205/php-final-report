@@ -33,7 +33,7 @@ if (!function_exists('execute_attack')) {
 $p_build = get_skill_build($conn, $user_id);
 $sb      = get_skill_stat_bonus($p_build);
 $skill_ss = skill_combat_init();  // 技能戰鬥狀態
-$enemy_corr = 0;                  // 侵蝕詛咒：敵方 DEF 削減層數
+$enemy_corr = 0.0;                // 侵蝕詛咒：敵方 DEF 削減百分比（0~50）
 
 // 開始初始化戰鬥數據
 $is_boss = ($event === 'boss');
@@ -98,7 +98,7 @@ while ($run['hp'] > 0 && $m_hp > 0) {
     }
 
     // ── 玩家攻擊 ──
-    $eff_m_def_corroded = max(0, $m_def - $enemy_corr);  // 侵蝕削減後的怪物防禦（基於實際縮放後的 def）
+    $eff_m_def_corroded = max(0, (int)($m_def * (1 - $enemy_corr / 100)));  // 侵蝕削減後的怪物防禦（百分比削減）
     $eff_m_def = ($boss_vars['defense_turns'] > 0) ? $eff_m_def_corroded * 3 : $eff_m_def_corroded;
 
     // 報復之刃：本回合必爆

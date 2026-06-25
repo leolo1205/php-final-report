@@ -406,7 +406,7 @@ function get_archetype_nodes() {
             3 => ['type' => 'skill', 'label' => '🌿 生命脈動', 'skill' => 'life_pulse', 'desc' => '每回合恢復最大HP×4%'],
             4 => ['type' => 'stat', 'label' => 'HP +30', 'hp' => 30],
             5 => ['type' => 'stat', 'label' => 'DEF +1', 'def' => 1],
-            6 => ['type' => 'skill', 'label' => '🧪 侵蝕詛咒', 'skill' => 'corrosion_curse', 'desc' => '每次攻擊削減敵方DEF-3(上限-30)，追加層數×1.15真傷'],
+            6 => ['type' => 'skill', 'label' => '🧪 侵蝕詛咒', 'skill' => 'corrosion_curse', 'desc' => '每次攻擊削減敵方DEF×0.5%（上限50%），追加削減量×1.15真傷'],
             7 => ['type' => 'stat', 'label' => 'HP +30', 'hp' => 30],
             8 => ['type' => 'stat', 'label' => 'DEF +2', 'def' => 2],
             9 => ['type' => 'skill', 'label' => '🔮 不滅之軀', 'skill' => 'undying_body', 'desc' => 'HP首次歸零時復活至25%，下次受傷減半'],
@@ -550,10 +550,10 @@ function skill_on_player_attack($build, &$ss, $hit_result, $enemy_hp, $enemy_max
     }
 
     if (has_skill($build, 'corrosion_curse')) {
-        $enemy_corr = min(30, $enemy_corr + 3);
+        $enemy_corr = min(50, $enemy_corr + 0.5);
         $td = (int)($enemy_corr * 1.15);
         $extra += $td;
-        $log .= "🧪 侵蝕：DEF -{$enemy_corr}，追加真傷 {$td}。";
+        $log .= "🧪 侵蝕：DEF -{$enemy_corr}%，追加真傷 {$td}。";
     }
 
     return compact('extra', 'log');
