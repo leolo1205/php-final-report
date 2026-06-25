@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // 前台側邊欄 include
 // 需要：$user['username'], $user['level'] 已定義
 $_sb_page = basename($_SERVER['PHP_SELF']);
