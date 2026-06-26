@@ -79,6 +79,8 @@ $p_dmg = (int)$effective['atk']['value'] + (int)($run['buffs']['dmg'] ?? 0);
 $p_def_base = (int)$effective['def']['value'] + (int)($run['buffs']['def'] ?? 0);
 $p_max_hp_with_bonus = (int)$effective['hp']['value'] + (int)($run['buffs']['max_hp'] ?? 0);
 $p_crit_rate_eff = $p_crit_rate + (int)($sb['crit'] ?? 0);
+$run['damage_dealt'] = (int)($run['damage_dealt'] ?? 0);
+$run['damage_taken'] = (int)($run['damage_taken'] ?? 0);
 
 while ($run['hp'] > 0 && $m_hp > 0) {
 
@@ -117,6 +119,7 @@ while ($run['hp'] > 0 && $m_hp > 0) {
     $p_dmg_this_turn = (int)($p_dmg * (1 + $hunt_bonus));
 
     $hit_result = execute_attack($user['username'], $m_hp, $p_dmg_this_turn, $eff_m_def, $p_crit_this_turn, $m_dodge, true, false, false, $node_new, $node_old, $run);
+    if ($hit_result['hit']) $run['damage_dealt'] += $hit_result['damage'];
 
     // 攻擊命中後的技能效果
     $sa = skill_on_player_attack($p_build, $skill_ss, $hit_result, $m_hp, $m_max_hp, $enemy_corr);
@@ -169,6 +172,7 @@ while ($run['hp'] > 0 && $m_hp > 0) {
             }
 
             $mon_hit = execute_attack(strip_tags($m_name), $run['hp'], $eff_m_dmg, $p_def_eff, $m_crit, $p_dodge_rate, false, true, $is_special_atk, $node_new, $node_old, $run);
+            if ($mon_hit['hit']) $run['damage_taken'] += $mon_hit['damage'];
 
             // 不滅之軀：命中後消耗免疫
             if ($skill_ss['undying_immune'] && $mon_hit['hit'] && $mon_hit['damage'] > 0) {

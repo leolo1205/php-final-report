@@ -282,8 +282,10 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
     }
 
     $result_type = $is_win ? 'win' : ($run['state'] === 'retreat' ? 'escape' : 'lose');
-    $stmt = $conn->prepare("INSERT INTO battle_logs (user_id, floor, result, exp_gained, gold_gained) VALUES (?,?,?,?,?)");
-    $stmt->bind_param('iisii', $user_id, $target_floor, $result_type, $f_exp, $f_gold);
+    $dmg_dealt = (int)($run['damage_dealt'] ?? 0);
+    $dmg_taken = (int)($run['damage_taken'] ?? 0);
+    $stmt = $conn->prepare("INSERT INTO battle_logs (user_id, floor, result, damage_dealt, damage_taken, exp_gained, gold_gained) VALUES (?,?,?,?,?,?,?)");
+    $stmt->bind_param('iisiiii', $user_id, $target_floor, $result_type, $dmg_dealt, $dmg_taken, $f_exp, $f_gold);
     $stmt->execute(); $stmt->close();
 
     $ms = (int)((microtime(true) - $t_start) * 1000);

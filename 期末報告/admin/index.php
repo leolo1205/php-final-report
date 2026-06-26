@@ -105,7 +105,8 @@ $rank_floor = $conn->query("SELECT id,username,level,max_floor FROM users WHERE 
             <td><span class="rank <?=$cls?>"><?=($i<=3?['🥇','🥈','🥉'][$i-1]:$i)?></span></td>
             <td><?= htmlspecialchars($r['username']) ?></td>
             <td><b style="color:#4fc3f7;">Lv.<?= $r['level'] ?></b></td>
-            <td><?= number_format($r['exp']) ?> / <?= number_format($r['level']*100) ?></td>
+            <?php $need = 25*$r['level']*($r['level']+1)+50; $exp_display = ($r['exp']==0 && $r['level']>1) ? '<span style="color:#888">—</span>' : number_format($r['exp']).' / '.number_format($need); ?>
+            <td><?= $exp_display ?></td>
             <td><?= $r['max_floor'] ?>F</td>
             <td><a href="players.php?id=<?=$r['id']?>" class="btn btn-primary">詳情</a></td>
           </tr>
