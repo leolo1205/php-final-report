@@ -37,7 +37,7 @@ while ($r = $res->fetch_assoc()) $history[] = $r;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>競技場 — 塔城傳說</title>
+<title>競技場 — 異界塔</title>
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
 <link rel="stylesheet" href="assets/style.css">
 <style>

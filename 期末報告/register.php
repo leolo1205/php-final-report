@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>註冊 — 塔城傳說</title>
+<title>註冊 — 異界塔</title>
 <link rel="stylesheet" href="assets/style.css">
 <style>
 /* register 頁面專屬 */

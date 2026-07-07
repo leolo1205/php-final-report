@@ -46,7 +46,7 @@ $max_level = FORGE_MAX_LEVEL;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鍛造 — 塔城傳說</title>
+<title>鍛造 — 異界塔</title>
 <meta name="csrf-token" content="<?= htmlspecialchars($_csrf, ENT_QUOTES, 'UTF-8') ?>">
 <link rel="stylesheet" href="assets/style.css">
 <style>
