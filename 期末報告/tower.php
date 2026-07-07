@@ -22,10 +22,47 @@ $monster_db = [];
 $mob_res = $conn->query("SELECT * FROM monster_stats");
 if ($mob_res) { while ($row = $mob_res->fetch_assoc()) { $monster_db[$row['level']] = $row; } }
 
+// 領取獎勵（必須 POST + CSRF）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'claim_rewards') {
+    if (!csrf_verify()) die('安全驗證失敗');
+    if (isset($_SESSION['pending_rewards'])) {
+        $pr = $_SESSION['pending_rewards'];
+        // 寫入技能熟練度
+        foreach (($pr['skill_gains'] ?? []) as $s_id => $gained_exp) {
+            if (!in_array($s_id, ['crit', 'dodge'], true)) continue;
+            $sel = $conn->prepare("SELECT level, exp FROM user_skills WHERE user_id=? AND skill_id=?");
+            $sel->bind_param('is', $user_id, $s_id);
+            $sel->execute();
+            $row = $sel->get_result()->fetch_assoc();
+            $sel->close();
+            $s_lvl = (int)($row['level'] ?? 0);
+            $s_exp = (int)($row['exp'] ?? 0) + $gained_exp;
+            while ($s_exp >= ($s_lvl + 1) * 10) { $s_exp -= ($s_lvl + 1) * 10; $s_lvl++; }
+            $ins = $conn->prepare("INSERT INTO user_skills (user_id, skill_id, level, exp) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE level=VALUES(level), exp=VALUES(exp)");
+            $ins->bind_param('isis', $user_id, $s_id, $s_lvl, $s_exp);
+            $ins->execute(); $ins->close();
+        }
+        // 寫入金幣與經驗
+        if ($pr['state'] !== 'dead') {
+            $safe_gold = max(0, (int)$pr['gold']);
+            $f_exp = (int)$pr['exp'];
+            $stmt = $conn->prepare("UPDATE users SET gold=gold+?, exp=exp+? WHERE id=?");
+            $stmt->bind_param('iii', $safe_gold, $f_exp, $user_id);
+            $stmt->execute(); $stmt->close();
+        }
+        unset($_SESSION['pending_rewards']);
+    }
+    header('Location: index.php'); exit;
+}
+
 // 初始化樓層（必須 POST + CSRF，防止 CSRF 偽造扣金幣）
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['floor'])) {
     if (!csrf_verify()) {
         die("<h2 style='color:white; text-align:center;'>安全驗證失敗，請重新整理後再試。<br><a href='index.php'>⬅ 返回</a></h2>");
+    }
+    // Bug1 修正：已有進行中的戰鬥或未領取獎勵時，禁止開新戰鬥
+    if (isset($_SESSION['run']) || isset($_SESSION['pending_rewards'])) {
+        die("<h2 style='color:white; text-align:center;'>⚔️ 已有進行中的戰鬥！<br>請先完成並領取目前的結算獎勵。<br><a href='tower.php'>⬅ 返回</a></h2>");
     }
     $target_floor = (int)$_POST['floor'];
     if ($target_floor < 1 || $target_floor > 100 || $target_floor > $user['max_floor'] + 1) {
@@ -243,44 +280,31 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
     $crit_gain_display = 0; 
     $dodge_gain_display = 0;
 
-    // 處理技能升級
+    // 計算技能熟練度顯示用（不寫 DB，等待玩家按結算）
     if (isset($run['skill_gains']) && !empty($run['skill_gains'])) {
         foreach ($run['skill_gains'] as $s_id => $gained_exp) {
-            if (!in_array($s_id, ['crit', 'dodge'], true)) continue;
-            if ($s_id === 'crit') $crit_gain_display = $gained_exp;
+            if ($s_id === 'crit')  $crit_gain_display  = $gained_exp;
             if ($s_id === 'dodge') $dodge_gain_display = $gained_exp;
-
-            $sel = $conn->prepare("SELECT level, exp FROM user_skills WHERE user_id=? AND skill_id=?");
-            $sel->bind_param('is', $user_id, $s_id);
-            $sel->execute();
-            $row = $sel->get_result()->fetch_assoc();
-            $sel->close();
-
-            $s_lvl = (int)($row['level'] ?? 0);
-            $s_exp = (int)($row['exp']   ?? 0) + $gained_exp;
-            while ($s_exp >= ($s_lvl + 1) * 10) { $s_exp -= ($s_lvl + 1) * 10; $s_lvl++; }
-
-            $ins = $conn->prepare("INSERT INTO user_skills (user_id, skill_id, level, exp) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE level=VALUES(level), exp=VALUES(exp)");
-            $ins->bind_param('isis', $user_id, $s_id, $s_lvl, $s_exp);
-            $ins->execute();
-            $ins->close();
         }
     }
-    
+
     $is_win = ($run['state'] !== 'retreat' && $run['hp'] > 0);
+
+    // 立即處理：更新最高樓層（進度，非獎勵）
     if ($is_win && $target_floor > $user['max_floor']) {
         $stmt = $conn->prepare("UPDATE users SET max_floor=? WHERE id=?");
         $stmt->bind_param('ii', $target_floor, $user_id);
         $stmt->execute(); $stmt->close();
     }
-    // 死亡不給獎勵；勝利與撤退才寫入，且確保 gold 非負
-    if ($run['state'] !== 'dead') {
-        $safe_gold = max(0, $f_gold);
-        $stmt = $conn->prepare("UPDATE users SET gold=gold+?, exp=exp+? WHERE id=?");
-        $stmt->bind_param('iii', $safe_gold, $f_exp, $user_id);
+
+    // 立即處理：失敗冷卻
+    if ($run['state'] === 'dead') {
+        $stmt = $conn->prepare("UPDATE users SET tower_fail_until=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=?");
+        $stmt->bind_param('i', $user_id);
         $stmt->execute(); $stmt->close();
     }
 
+    // 立即處理：戰鬥紀錄
     $result_type = $is_win ? 'win' : ($run['state'] === 'retreat' ? 'escape' : 'lose');
     $dmg_dealt = (int)($run['damage_dealt'] ?? 0);
     $dmg_taken = (int)($run['damage_taken'] ?? 0);
@@ -293,18 +317,16 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
         'floor' => $target_floor,
         'nodes' => $run['node'],
         'mode'  => ($_SESSION['auto_settings']['mode'] ?? 'manual'),
-    ], [
-        'gold' => $f_gold,
-        'exp'  => $f_exp,
-        'hp_remaining' => $run['hp'],
-    ]);
+    ], ['gold' => $f_gold, 'exp' => $f_exp, 'hp_remaining' => $run['hp']]);
 
-    // 失敗時設定 1 小時冷卻（撤退不算失敗）
-    if ($run['state'] === 'dead') {
-        $stmt = $conn->prepare("UPDATE users SET tower_fail_until=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=?");
-        $stmt->bind_param('i', $user_id);
-        $stmt->execute(); $stmt->close();
-    }
+    // Bug2 修正：金幣/EXP/技能不立刻寫入，存入 pending_rewards 等玩家按結算
+    $_SESSION['pending_rewards'] = [
+        'floor'       => $target_floor,
+        'gold'        => $f_gold,
+        'exp'         => $f_exp,
+        'state'       => $run['state'],
+        'skill_gains' => $run['skill_gains'] ?? [],
+    ];
 
     // 組裝結算 HTML 排版
     if ($run['state'] === 'retreat') {
@@ -324,7 +346,8 @@ if (($run['state'] === 'auto' && $run['node'] > 30) || $run['state'] === 'dead' 
     if ($dodge_gain_display > 0) $end_html .= "<br><span style='color:#81c784;'>🍃 閃避熟練度 +$dodge_gain_display</span>";
     $end_html .= "</p>";
     
-    $new_log .= "<div class='node-box success-box reveal-item hidden-item' data-delay='1000'>$end_html<a href='index.php' class='back-btn'>⬅ 結算並返回城鎮</a></div>";
+    $csrf_field = '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+    $new_log .= "<div class='node-box success-box reveal-item hidden-item' data-delay='1000'>$end_html<form method='post' style='margin:0;'>{$csrf_field}<input type='hidden' name='action' value='claim_rewards'><button type='submit' class='back-btn' style='cursor:pointer;border:none;width:100%;'>⬅ 領取獎勵並返回城鎮</button></form></div>";
     
     unset($_SESSION['run']); 
 }
