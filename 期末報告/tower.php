@@ -62,7 +62,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['floor'])) {
     }
     // Bug1 修正：已有進行中的戰鬥或未領取獎勵時，禁止開新戰鬥
     if (isset($_SESSION['run']) || isset($_SESSION['pending_rewards'])) {
-        die("<h2 style='color:white; text-align:center;'>⚔️ 已有進行中的戰鬥！<br>請先完成並領取目前的結算獎勵。<br><a href='tower.php'>⬅ 返回</a></h2>");
+        ?><!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>塔城傳說</title>
+<style>
+  body { background:#1a1a2e; color:#eee; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; }
+  .box { text-align:center; background:#16213e; border:1px solid #e94560; border-radius:12px; padding:48px 64px; }
+  .box h2 { color:#e94560; font-size:1.8rem; margin-bottom:12px; }
+  .box p { color:#aaa; margin-bottom:28px; }
+  .btn { display:inline-block; background:#e94560; color:#fff; text-decoration:none; padding:12px 32px; border-radius:8px; font-size:1rem; margin:6px; }
+  .btn-sec { background:#0f3460; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>⚔️ 你正在戰鬥中</h2>
+  <p>目前已有一場戰鬥正在進行，<br>請先完成並領取結算獎勵後再開始新的戰鬥。</p>
+  <a class="btn btn-sec" href="tower.php">繼續戰鬥</a>
+  <a class="btn" href="index.php">返回城鎮</a>
+</div>
+</body>
+</html><?php
+        exit;
     }
     $target_floor = (int)$_POST['floor'];
     if ($target_floor < 1 || $target_floor > 100 || $target_floor > $user['max_floor'] + 1) {
